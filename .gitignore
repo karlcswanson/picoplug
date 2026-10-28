@@ -1,0 +1,11 @@
+build-*/
+firmware/lib/.picotool/
+hc-profile-*/
+*.png
+!firmware/src/web/*.png
+.DS_Store
+.env
+__pycache__/
+
+# private planning docs and notes
+ref/

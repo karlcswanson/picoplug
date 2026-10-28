@@ -1,0 +1,48 @@
+; pio_spi.pio - full-duplex SPI mode 0 (CPOL=0, CPHA=0), MSB first, 8-bit.
+;
+; SCK is the side-set pin, MOSI the OUT pin, MISO the IN pin. Four PIO cycles
+; per bit: MOSI is driven on the falling edge, SCK rises two cycles later, and
+; MISO is sampled one cycle after the rising edge (the W5500 changes its
+; output on the falling edge, so late-in-high-phase sampling gives the most
+; margin). The input synchronizer on MISO is bypassed so the sample is not
+; delayed by two extra system clocks. SPI clock = sys_clk / (4 * clkdiv).
+; When the TX FIFO runs dry the state machine stalls on `out` with SCK low,
+; which is the idle level.
+; Used for the W55RP20, whose internal W5500 pins do not map to an SPI block.
+
+.program pio_spi_mode0
+.side_set 1
+    out pins, 1  side 0 [1]   ; falling edge, drive MOSI, hold low
+    nop          side 1       ; rising edge
+    in  pins, 1  side 1       ; sample MISO late in the high phase
+
+% c-sdk {
+#include "hardware/gpio.h"
+
+static inline void pio_spi_mode0_program_init(PIO pio, uint sm, uint offset, float clkdiv,
+                                              uint pin_sck, uint pin_mosi, uint pin_miso)
+{
+    pio_sm_config c = pio_spi_mode0_program_get_default_config(offset);
+    sm_config_set_out_pins(&c, pin_mosi, 1);
+    sm_config_set_in_pins(&c, pin_miso);
+    sm_config_set_sideset_pins(&c, pin_sck);
+    /* MSB first: shift left, autopull/autopush every 8 bits */
+    sm_config_set_out_shift(&c, false, true, 8);
+    sm_config_set_in_shift(&c, false, true, 8);
+    sm_config_set_clkdiv(&c, clkdiv);
+
+    pio_sm_set_pins_with_mask(pio, sm, 0, (1u << pin_sck) | (1u << pin_mosi));
+    pio_sm_set_pindirs_with_mask(pio, sm, (1u << pin_sck) | (1u << pin_mosi),
+                                 (1u << pin_sck) | (1u << pin_mosi) | (1u << pin_miso));
+    pio_gpio_init(pio, pin_sck);
+    pio_gpio_init(pio, pin_mosi);
+    pio_gpio_init(pio, pin_miso);
+    gpio_set_input_hysteresis_enabled(pin_miso, true);
+    /* Skip the 2-cycle input synchronizer on MISO: SPI is synchronous to our
+     * own clock, so metastability is not a concern and the latency matters. */
+    hw_set_bits(&pio->input_sync_bypass, 1u << pin_miso);
+
+    pio_sm_init(pio, sm, offset, &c);
+    pio_sm_set_enabled(pio, sm, true);
+}
+%}
