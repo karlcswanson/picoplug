@@ -14,6 +14,7 @@ typedef struct { uint8_t *b; size_t cap, pos; bool overflow; } wr_t;
 
 static void put(wr_t *w, const void *p, size_t n)
 {
+    if (!n) return;
     if (w->pos + n > w->cap) { w->overflow = true; return; }
     memcpy(w->b + w->pos, p, n);
     w->pos += n;

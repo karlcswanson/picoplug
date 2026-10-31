@@ -72,7 +72,7 @@ static size_t frame_llc(uint8_t *f, uint8_t version, uint8_t type, const uint8_t
 
 static int test_config(void)
 {
-    uint8_t bd[64], f[128];
+    uint8_t bd[64], f[256];
     size_t bl = body(bd, 0x00, 0x8000, ROOT, 19, 0x8000, SW, 0x8008);
     size_t n = frame_llc(f, 0, STP_TYPE_CONFIG, bd, bl, true);
     CHECK(stp_is_bpdu(f, n));
@@ -95,7 +95,7 @@ static int test_config(void)
 
 static int test_rstp(void)
 {
-    uint8_t bd[64], f[128];
+    uint8_t bd[64], f[256];
     /* designated (role 3 -> bits 2-3 = 0b11 = 0x0C), learning+forwarding, agreement */
     size_t bl = body(bd, 0x0C | 0x10 | 0x20 | 0x40, 0x8001, SW, 0, 0x8001, SW, 0x8008);
     size_t n = frame_llc(f, 2, STP_TYPE_RST, bd, bl, true);
@@ -123,7 +123,7 @@ static int test_rstp(void)
 
 static int test_tcn(void)
 {
-    uint8_t f[128];
+    uint8_t f[256];
     size_t n = frame_llc(f, 0, STP_TYPE_TCN, NULL, 0, true);
     stp_bpdu_t b;
     CHECK(stp_parse(f, n, &b));
@@ -175,7 +175,7 @@ static int test_pvst(void)
 
 static int test_errors(void)
 {
-    uint8_t bd[64], f[128];
+    uint8_t bd[64], f[256];
     size_t bl = body(bd, 0x3C, 0x8000, ROOT, 19, 0x8000, SW, 0x8008);
     size_t n = frame_llc(f, 2, STP_TYPE_RST, bd, bl, false);
     stp_bpdu_t b;
@@ -216,7 +216,7 @@ static int test_errors(void)
 
 static int test_tracker(void)
 {
-    uint8_t bd[64], f[128];
+    uint8_t bd[64], f[256];
     stp_state_t s; stp_state_reset(&s);
     CHECK(!s.seen);
     size_t bl = body(bd, 0x0C | 0x20, 0x8000, ROOT, 19, 0x8000, SW, 0x8008);

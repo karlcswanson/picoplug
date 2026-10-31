@@ -32,7 +32,8 @@ static size_t frame(uint8_t *f, bool tagged, uint8_t ver, uint8_t type, const ui
     if (tagged) { f[n++] = 0x81; f[n++] = 0x00; f[n++] = 0x00; f[n++] = 0x0A; }
     f[n++] = 0x88; f[n++] = 0x8E;
     f[n++] = ver; f[n++] = type; f[n++] = (uint8_t)(blen >> 8); f[n++] = (uint8_t)blen;
-    memcpy(f + n, body, blen); n += blen;
+    if (blen) memcpy(f + n, body, blen);
+    n += blen;
     return n;
 }
 
