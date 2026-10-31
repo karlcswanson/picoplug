@@ -1,5 +1,5 @@
 <script>
-  // Lucide icons, same sprite as the shipping page; see THIRD_PARTY_LICENSES.md
+  // Lucide icons; see THIRD_PARTY_LICENSES.md
   import sprite from './sprite.svg?raw';
 </script>
 

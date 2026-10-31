@@ -1,4 +1,4 @@
-// Ports visited and recent tool runs, kept in this browser (same keys as the shipping page).
+// Ports visited and recent tool runs, kept in this browser (keys unchanged from the first page, so old history still shows).
 
 import { hKey, stripKind } from './format.js';
 

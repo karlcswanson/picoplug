@@ -22,7 +22,7 @@
   function whoIs(ip, mac) {
     const d = (s.port && s.port.dhcp) || {}, c = cur || {};
     const cmac = (c.chassis_id || '').replace(/^mac:/, '');
-    if (ip && (c.mgmt_addr || []).includes(ip) || mac && cmac && cmac === mac) return 'this switch' + (c.sys_name ? ' (' + c.sys_name + ')' : '');
+    if ((ip && (c.mgmt_addr || []).includes(ip)) || (mac && cmac && cmac === mac)) return 'this switch' + (c.sys_name ? ' (' + c.sys_name + ')' : '');
     if (ip && ip === d.gateway) return 'the gateway';
     if (mac && mac === d.server_mac) return 'the DHCP server';
     if (ig.mrouter && ip === ig.mrouter.ip) return 'the multicast router';

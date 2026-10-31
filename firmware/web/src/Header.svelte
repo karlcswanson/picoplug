@@ -1,7 +1,9 @@
 <script>
   // Black header band: logo, one-line port summary, link lights, tabs.
   import Icon from './lib/Icon.svelte';
-  import { isP, probeTitle, portName, isStale, fmtDur } from './lib/format.js';
+  import Mark from './lib/Mark.svelte';
+  import ProbeBadge from './lib/ProbeBadge.svelte';
+  import { portName, isStale, fmtDur } from './lib/format.js';
   import { app } from './lib/app.svelte.js';
   const TABS = [['port', 'port', 'Port'], ['tools', 'ping', 'Tools'], ['log', 'log', 'Log'], ['setup', 'sliders', 'Setup']];
 
@@ -30,7 +32,7 @@
 <header>
   <div class="hbar">
     <div class="brand">
-      <span class="logo"><svg class="mark" viewBox="0 0 24 24" aria-hidden="true"><g fill="none" stroke="#f2f0e8" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.75"><path d="M6.25 8.5 2.75 12l3.5 3.5"/><path d="M17.75 8.5 21.25 12l-3.5 3.5"/></g><circle cx="8" cy="12" r="1.3" fill="#2fd46f"/><circle cx="12" cy="12" r="1.3" fill="#ffcf00"/><circle cx="16" cy="12" r="1.3" fill="#ff4d4d"/></svg>picoplug{#if s && isP(s.probe)}<span class="pb pb{s.probe}" title={probeTitle(s.probe)}>{s.probe}</span>{/if}</span>
+      <span class="logo"><Mark/>picoplug{#if s}<ProbeBadge n={s.probe}/>{/if}</span>
       <a class="hstat" href="#port">
         {#if lost}<span class="bad">No device</span>
         {:else if !s}Connecting…

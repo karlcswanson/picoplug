@@ -1,4 +1,4 @@
-// Formatting and neighbor helpers shared by the cards (ported from the shipping page).
+// Formatting and neighbor helpers shared by the cards.
 
 export const stripKind = s => s && s.replace(/^[a-z]+:/, '');
 // hosts running lldpd (macOS, Linux) send a MAC as the port ID and the interface name as the description
@@ -15,8 +15,12 @@ export const fmtAgo = s => s < 60 ? s + ' s ago' : s < 3600 ? Math.floor(s / 60)
 export const fmtDur = s => s === undefined ? '-' : s < 120 ? s + ' s' : s < 7200 ? Math.round(s / 60) + ' min'
   : s < 172800 ? Math.round(s / 3600) + ' h' : Math.round(s / 86400) + ' d';
 
+// the device reports sub-millisecond times as 0
+export const fmtMs = ms => (ms || '<1') + ' ms';
+// font size that keeps a long port name on one line (mono glyphs are ~0.62em wide)
+export const portFit = p => p && p.length > 12 ? `min(36px,calc((100cqw - 32px) / ${(0.62 * p.length).toFixed(2)}))` : undefined;
+
 export const isP = n => typeof n === 'number' && n >= 0 && n <= 9;
-export const probeTitle = n => `Probe ${n}, ${RES[n]}`;
 
 export function pickCurrent(ns, selKey) {
   if (selKey) { const k = ns.find(n => hKey(n) === selKey); if (k) return k; }

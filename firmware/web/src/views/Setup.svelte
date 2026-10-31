@@ -1,5 +1,5 @@
 <script module>
-  // kept across tab switches, as the fields and messages were on the shipping page
+  // kept across tab switches
   const f = $state({ probe: '', probeSaved: '', lldp: false, cdp: false, ping: '', name: '', dns: '', usb: '', defaults: {}, reboot: false, usbSaved: '' });
   const m = $state({ msg: '', fmsg: '' });
 </script>

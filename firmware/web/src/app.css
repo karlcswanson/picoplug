@@ -18,7 +18,7 @@ header{position:sticky;top:0;z-index:5;background:var(--ink);color:#f2f0e8;borde
 .hbar{max-width:560px;margin:0 auto;display:flex;align-items:center;justify-content:space-between;gap:10px;padding:10px 12px 8px}
 .brand{min-width:0}
 .logo{display:block;font:700 19px/1.1 var(--mono);color:var(--yel)}
-.logo .mark{width:36px;height:36px;margin:-9px 6px -9px -5px;vertical-align:-4px}
+.logo .mark{color:#f2f0e8;width:36px;height:36px;margin:-9px 6px -9px -5px;vertical-align:-4px}
 .pb{display:inline-flex;align-items:center;justify-content:center;min-width:22px;height:22px;padding:0 4px;margin-right:6px;border:1px solid var(--edge);border-radius:var(--r);font:700 14px/1 var(--mono);vertical-align:middle;color:#fff}
 .logo .pb{margin:0 0 0 8px;vertical-align:2px;border-color:#cfcdc5}
 .pb0{background:#141414}.pb1{background:#7b4a1e}.pb2{background:#c8102e}.pb3{background:#f07d00;color:#141414}.pb4{background:#ffcf00;color:#141414}
@@ -69,7 +69,7 @@ header{position:sticky;top:0;z-index:5;background:var(--ink);color:#f2f0e8;borde
 .pc.empty .sec{color:var(--mut)}
 .pc.empty{margin-bottom:8px}
 .sr{position:absolute!important;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
-.psum .ic.c-bad{width:20px;height:20px}
+
 .grp{grid-column:1/-1;display:flex;align-items:center;gap:6px;font:700 12px/1.2 var(--sans);color:var(--mut);margin:8px 0 -2px}
 .tags{display:flex;flex-wrap:wrap;gap:6px;margin-top:4px}
 .tag{font:500 13px/1 var(--mono);padding:5px 7px;border-radius:var(--r);background:var(--card);border:1px solid var(--line)}
@@ -114,7 +114,7 @@ input.in,select.in{display:block;width:100%;font:500 16px/1 var(--mono);min-heig
 .chk .lb small{display:block;font:500 12px/1.3 var(--mono);color:var(--mut);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .chk .lat{font:500 15px/1 var(--mono);white-space:nowrap}
 .chk>.ic:last-child{color:var(--mut)}
-.c-ok{color:var(--ok)}.c-warn{color:var(--warn)}.c-bad{color:var(--bad)}.c-mut{color:var(--mut)}
+.c-ok{color:var(--ok)}.c-mut{color:var(--mut)}
 /* alerts and notes */
 /* overlays the top of the page instead of growing the header, so nothing below moves */
 .conn{position:absolute;left:0;right:0;top:calc(100% + 3px);display:flex;justify-content:center;align-items:center;gap:8px;padding:6px 12px 8px;background:var(--ink);font:600 12px/1.3 var(--mono);color:var(--yel)}

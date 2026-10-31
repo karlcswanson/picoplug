@@ -2,13 +2,14 @@
   // The switch card: who is on the other end of the cable, port, VLANs, details on demand.
   import Icon from '../lib/Icon.svelte';
   import Kv from '../lib/Kv.svelte';
-  import { copyable, copyText } from '../lib/copy.svelte.js';
-  import { say } from '../lib/copy.svelte.js';
+  import { copyable, copyText, say } from '../lib/copy.svelte.js';
+  import Parts from '../lib/Parts.svelte';
+  import { sg } from '../lib/parts.js';
   import { ui, sel } from '../lib/ui.svelte.js';
   import More from '../lib/More.svelte';
   import { app, formFill, formVals } from '../lib/app.svelte.js';
   import { conn } from '../lib/status.svelte.js';
-  import { stripKind, portName, isHost, isStale, v4first, hKey, fmtAgo, fmtDur, summary } from '../lib/format.js';
+  import { stripKind, portName, isHost, isStale, v4first, hKey, fmtAgo, fmtDur, portFit, summary } from '../lib/format.js';
 
   // detail: the copy shown in Ports visited (everything open, no controls); foot replaces the TTL line
   let { n, neighbors = [], detail = false, foot } = $props();
@@ -44,20 +45,13 @@
     || inv.hw || inv.fw || inv.sw || inv.asset || has(n.mgmt_vid) || (n.ppvids && n.ppvids.length) || n.protocols || n.eee || n.location));
   let extra = $derived([n.vlans ? 'VLANs' : '', poe || cpow ? 'PoE' : '', n.platform ? 'platform' : '',
     n.caps ? 'caps' : '', n.link_agg ? 'LAG' : '', 'chassis'].filter(Boolean).join(', '));
-  // font shrinks so a long port name stays on one line (mono glyphs are ~0.62em wide)
-  let fit = $derived(port && port.length > 12 ? `min(36px,calc((100cqw - 32px) / ${(0.62 * port.length).toFixed(2)}))` : undefined);
+  let fit = $derived(portFit(port));
 
-  function share() {
-    const t = summary(n);
-    if (!detail && navigator.share && window.isSecureContext) navigator.share({ title: 'LLDP neighbor', text: t }).catch(() => copyText(t));
-    else copyText(t);
-  }
   function relisten() {
     fetch('/tool?relisten=1').then(r => r.json()).then(j => say(j.ok ? 'Listening again' : (j.error || 'Rejected'))).catch(() => say('No reply'));
   }
 </script>
 
-{#snippet sg(v, label)}{#if v !== undefined && v !== null && v !== ''}<span class="sg" use:copyable={v}>{label ? label + ' ' : ''}{v}</span>{/if}{/snippet}
 {#snippet nws(s)}{#each s.split(' · ') as p, i}{#if i}{' · '}{/if}<span class="nw">{p}</span>{/each}{/snippet}
 {#snippet mut()}<span class="c-mut">--</span>{/snippet}
 
@@ -101,14 +95,14 @@
       {#if poe || cpow}<Kv k="PoE">{@render nws(poe || cpow)}</Kv>{/if}
       {#if n.platform}<Kv k="Platform">{n.platform}</Kv>{/if}
       {#if n.vtp_domain}<Kv k="VTP domain">{n.vtp_domain}</Kv>{/if}
-      {#if n.duplex || n.mtu}<Kv k="Duplex / MTU">{@render sg(n.duplex)}{#if n.duplex && has(n.mtu)}{' · '}{/if}{@render sg(n.mtu, 'MTU')}</Kv>{/if}
-      {#if inv.manufacturer || inv.model}<Kv k="Model">{@render sg(inv.manufacturer)}{#if inv.manufacturer && inv.model}{' '}{/if}{@render sg(inv.model)}</Kv>{/if}
-      {#if inv.hw || inv.fw || inv.sw}<Kv k="Revisions">{#each [['hw', inv.hw], ['fw', inv.fw], ['sw', inv.sw]].filter(r => r[1]) as [l, v], i}{#if i}{' · '}{/if}{@render sg(v, l)}{/each}</Kv>{/if}
+      {#if n.duplex || n.mtu}<Kv k="Duplex / MTU"><Parts p={[sg(n.duplex), sg(n.mtu, 'MTU')]}/></Kv>{/if}
+      {#if inv.manufacturer || inv.model}<Kv k="Model"><Parts sep=" " p={[sg(inv.manufacturer), sg(inv.model)]}/></Kv>{/if}
+      {#if inv.hw || inv.fw || inv.sw}<Kv k="Revisions"><Parts p={[sg(inv.hw, 'hw'), sg(inv.fw, 'fw'), sg(inv.sw, 'sw')]}/></Kv>{/if}
       {#if inv.asset}<Kv k="Asset ID">{inv.asset}</Kv>{/if}
       {#if has(n.mgmt_vid)}<Kv k="Mgmt VLAN">{n.mgmt_vid}</Kv>{/if}
       {#if n.ppvids && n.ppvids.length}<Kv k="Protocol VLANs">{n.ppvids.map(p => p.id).join(' ')}</Kv>{/if}
       {#if n.protocols}<Kv k="Protocols">{n.protocols}</Kv>{/if}
-      {#if n.eee}<Kv k="EEE">{@render sg(n.eee.tx_us + ' µs', 'tx')} · {@render sg(n.eee.rx_us + ' µs', 'rx')}</Kv>{/if}
+      {#if n.eee}<Kv k="EEE"><Parts p={[sg(n.eee.tx_us + ' µs', 'tx'), sg(n.eee.rx_us + ' µs', 'rx')]}/></Kv>{/if}
       {#if n.location}<Kv k="Location" wide copy={n.location.text}>{n.location.text}</Kv>{/if}
 
       <div class="grp"><Icon name="switch" size="s"/>Chassis</div>
@@ -123,6 +117,6 @@
   {#if !detail}<More key="nb" hint={extra}/>{/if}
   <div class="foot">
     <span>{foot !== undefined ? foot : 'TTL ' + n.ttl_remaining_s + ' s'}{n.unknown_tlvs ? ' · ' + n.unknown_tlvs + ' unknown TLV' : ''}</span>
-    <span class="crow">{#if form}<a class="btn q" href={form} target="_blank" rel="noopener"><Icon name="form"/>Form</a>{/if}<button class="q" onclick={share}><Icon name="copy"/>Copy</button></span>
+    <span class="crow">{#if form}<a class="btn q" href={form} target="_blank" rel="noopener"><Icon name="form"/>Form</a>{/if}<button class="q" onclick={() => copyText(summary(n))}><Icon name="copy"/>Copy</button></span>
   </div>
 </div>

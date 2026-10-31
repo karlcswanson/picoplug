@@ -1,5 +1,5 @@
 <script module>
-  // stays open across tab switches and link drops, as on the shipping page
+  // stays open across tab switches and link drops
   const dopt = $state({ open: false });
 </script>
 
@@ -11,7 +11,7 @@
   import Ln from '../lib/Ln.svelte';
   import More from '../lib/More.svelte';
   import { sg, nw, ok, yn } from '../lib/parts.js';
-  import { fmtAgo, fmtDur } from '../lib/format.js';
+  import { fmtAgo, fmtDur, fmtMs } from '../lib/format.js';
   import { dhcpOpts } from '../lib/dhcp.js';
   import { ui } from '../lib/ui.svelte.js';
   import { pickTarget, go, tool } from '../lib/app.svelte.js';
@@ -28,9 +28,9 @@
   let checks = $derived.by(() => {
     if (pr.gateway) {
       const g = pr.gateway, i = pr.internet, n = pr.dns;
-      return [['gw', 'Gateway', g.reachable ? 'ok' : 'bad', d.gateway, g.reachable ? (g.rtt_ms || '<1') + ' ms' : 'no reply'],
-        ['inet', 'Internet', i.reachable ? 'ok' : 'bad', i.target, i.reachable ? (i.rtt_ms || '<1') + ' ms' : 'no reply'],
-        ['dns', 'DNS', n.ok ? 'ok' : 'bad', n.name + (n.custom ? ' via ' + n.server : ''), n.ok ? (n.ms || '<1') + ' ms' : 'failed']];
+      return [['gw', 'Gateway', g.reachable ? 'ok' : 'bad', d.gateway, g.reachable ? fmtMs(g.rtt_ms) : 'no reply'],
+        ['inet', 'Internet', i.reachable ? 'ok' : 'bad', i.target, i.reachable ? fmtMs(i.rtt_ms) : 'no reply'],
+        ['dns', 'DNS', n.ok ? 'ok' : 'bad', n.name + (n.custom ? ' via ' + n.server : ''), n.ok ? fmtMs(n.ms) : 'failed']];
     }
     if (d.bound) return [['gw', 'Gateway', 'mut', d.gateway, 'checking…'], ['inet', 'Internet', 'mut', pr.internet && pr.internet.target, ''], ['dns', 'DNS', 'mut', '', '']];
     return [['gw', 'Gateway', 'mut', '', 'skipped'], ['inet', 'Internet', 'mut', '', 'skipped'], ['dns', 'DNS', 'mut', '', 'skipped']];
@@ -92,11 +92,11 @@
     {#if open && pr.gateway}
       {@const g = pr.gateway}{@const i = pr.internet}{@const n = pr.dns}
       <div class="grp"><Icon name="reach" size="s"/>Reachability</div>
-      <Kv k="Gateway ping"><Parts p={g.reachable ? ok(g.rtt_ms + ' ms (' + g.replies + '/' + g.sent + ')') : 'no reply' + (g.arp ? '' : ' · no ARP')}/></Kv>
-      <Kv k="Internet"><Parts p={i.reachable ? ok(i.rtt_ms + ' ms to ' + i.target) : 'unreachable · ' + i.target}/></Kv>
+      <Kv k="Gateway ping"><Parts p={g.reachable ? ok(fmtMs(g.rtt_ms) + ' (' + g.replies + '/' + g.sent + ')') : 'no reply' + (g.arp ? '' : ' · no ARP')}/></Kv>
+      <Kv k="Internet"><Parts p={i.reachable ? ok(fmtMs(i.rtt_ms) + ' to ' + i.target) : 'unreachable · ' + i.target}/></Kv>
       <!-- fixed two-line shape: the address and time change every run and must not change the row's height -->
       <Kv k="DNS lookup" wide>
-        {#if n.ok}<Parts p={yn(true, n.name)}/><Ln p={[nw(n.addr), nw(n.ms + ' ms')]}/>{:else}lookup failed · {n.name}{/if}
+        {#if n.ok}<Parts p={yn(true, n.name)}/><Ln p={[nw(n.addr), nw(fmtMs(n.ms))]}/>{:else}lookup failed · {n.name}{/if}
         {#if n.custom}<Ln p={'via ' + n.server + ' (setting)'}/>{/if}
       </Kv>
     {/if}

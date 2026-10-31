@@ -6,15 +6,13 @@
   import { hist, setNote, hDel, hClear, histCsv, fmtTime } from '../lib/history.svelte.js';
   import { app } from '../lib/app.svelte.js';
   import { copyable, copyText, say } from '../lib/copy.svelte.js';
-  import { stripKind } from '../lib/format.js';
+  import { stripKind, portFit } from '../lib/format.js';
 
   let fb = $state();
   // focus the copy box once per failed copy, not on every visit to Log
   $effect(() => { if (app.fbFocus && fb) { fb.focus(); fb.select(); app.fbFocus = false; } });
 
   const when = e => `first ${fmtTime(e.first)}${e.last - e.first > 60000 ? ' · last ' + fmtTime(e.last) : ''}${e.sessions > 1 ? ' · ' + e.sessions + ' visits' : ''}${e.dhcp ? ' · DHCP ' + e.dhcp : ''}`;
-  // shown as sent; a long name shrinks to stay on one line (mono glyphs are ~0.62em wide)
-  const fit = p => p && p.length > 12 ? `min(36px,calc((100cqw - 32px) / ${(0.62 * p.length).toFixed(2)}))` : undefined;
 
   function rowClick(e, k) {
     if (e.target.closest('input,.hdet,.copy,.sg,button')) return;
@@ -57,7 +55,7 @@
             {:else}
               <div class="card nb">
                 <div class="nrow"><Icon name="switch" size="l"/><div class="name">{e.sys_name || e.chassis}</div><span class="ptag">{e.proto.toUpperCase()}</span></div>
-                <div class="port copy" style:font-size={fit(e.port)} use:copyable={e.port}>{e.port}</div>
+                <div class="port copy" style:font-size={portFit(e.port)} use:copyable={e.port}>{e.port}</div>
                 <div class="desc">{e.port_desc}</div>
                 <div class="grid">
                   {#if e.pvid !== undefined && e.pvid !== null}<Kv k="PVID">{e.pvid}</Kv>{/if}

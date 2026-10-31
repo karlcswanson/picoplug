@@ -1,4 +1,4 @@
-// Expanders and the chosen neighbor, kept in localStorage (same key as the shipping page).
+// Expanders kept in localStorage, and the chosen neighbor.
 
 const KEY = 'picolldp.ui';
 function load() { try { return JSON.parse(localStorage.getItem(KEY) || '{}'); } catch (e) { return {}; } }
