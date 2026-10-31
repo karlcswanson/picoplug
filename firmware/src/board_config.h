@@ -9,7 +9,7 @@
 
 #include "pico.h"
 
-#define FW_VERSION              "0.3.2"
+#define FW_VERSION              "0.3.6"
 
 /* ---- W5500 SPI wiring ------------------------------------------------- */
 #if defined(WIZNET_W55RP20_EVB_PICO)
@@ -88,8 +88,11 @@
 #define USB_NET_REENUM_MAX              4
 #define USB_NET_REENUM_GOOD_S           5
 /* MAC prefixes for the USB link; low 3 bytes come from the unique ID.
- * The host-side MAC is what the phone/PC sees as its own adapter. */
-#define USB_MAC_HOST_PREFIX     { 0x02, 0x55, 0x48 }
+ * The host-side MAC is what the phone/PC sees as its own adapter. It is not
+ * locally administered (WIZnet's OUI): Linux names a CDC gadget with a
+ * locally administered MAC usb0, and Android only brings up eth\d as
+ * Ethernet. The device side never leaves the USB link, so it stays local. */
+#define USB_MAC_HOST_PREFIX     { 0x00, 0x08, 0xDC }
 #define USB_MAC_DEV_PREFIX      { 0x02, 0x55, 0x44 }
 
 #define API_TCP_PORT            9000

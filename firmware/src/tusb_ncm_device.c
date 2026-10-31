@@ -11,8 +11,7 @@
  * Why: macOS sometimes drops the data interface to alt 0 right after reading
  * the speed notification and before NetworkConnection arrives; with 0.18 both
  * sides then wait forever and the USB link never comes up (en29 "inactive").
- * See docs/HANDOFF.md, USB NCM row. firmware/CMakeLists.txt
- * substitutes this file for the SDK's copy.
+ * firmware/CMakeLists.txt substitutes this file for the SDK's copy.
  *
  * The MIT License (MIT)
  *

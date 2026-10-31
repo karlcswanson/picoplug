@@ -232,8 +232,9 @@ static void handle_request(conn_t *c)
         }
         advertise_get_state(&a);
         int n = snprintf(c->json, sizeof c->json,
-                         "{\"ok\":%s,\"lldp\":%s,\"cdp\":%s,\"lldp_frames\":%lu,\"cdp_frames\":%lu}\n",
+                         "{\"ok\":%s,\"lldp\":%s,\"cdp\":%s,\"cdp_peer\":%s,\"lldp_frames\":%lu,\"cdp_frames\":%lu}\n",
                          ok ? "true" : "false", a.lldp_enabled ? "true" : "false", a.cdp_enabled ? "true" : "false",
+                         a.cdp_peer ? "true" : "false",
                          (unsigned long)a.lldp_frames, (unsigned long)a.cdp_frames);
         respond(c, ok ? "200 OK" : "400 Bad Request", "application/json", c->json, (size_t)n, true);
     } else if (strcmp(path, "/tool") == 0) {

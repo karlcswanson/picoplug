@@ -30,7 +30,7 @@ typedef struct {
 } lldp_tx_cfg_t;
 
 /* Largest frame lldp_tx_build() can produce. */
-#define LLDP_TX_MAX_FRAME 512
+#define LLDP_TX_MAX_FRAME 640
 
 /* Writes a complete Ethernet frame (no FCS) into buf. Returns its length,
  * or 0 if cfg is invalid or buf is too small. */

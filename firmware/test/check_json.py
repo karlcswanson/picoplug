@@ -34,7 +34,7 @@ for i, line in enumerate(lines):
             assert nb[0]["port_id"] == "ifname:Gi1/0/12"
             assert nb[0]["poe"]["alloc_w"] == 15.4 and nb[0]["poe"]["class"] == 3
             assert nb[0]["voice_vlan"] == {"id": 30, "tagged": True, "priority": 5, "dscp": 46}
-            assert nb[0]["caps"] == ["bridge"] and nb[0]["truncated"] is True
+            assert nb[0]["caps"] == ["bridge"] and "truncated" not in nb[0]
             assert "\n" in nb[0]["sys_desc"]
         if expect_names[i] == "aruba-2930f-01":
             assert nb[0]["mgmt_addr"] == ["192.168.1.5", "fe80::96f1:28ff:fe12:3440"]

@@ -59,6 +59,7 @@ static int test_lldp_roundtrip(void)
     CHECK(nb.has_port_desc); CHECK_STR(nb.port_desc, "RJ45 tester port");
     CHECK(nb.has_sys_name); CHECK_STR(nb.sys_name, "picolldp");
     CHECK(nb.has_sys_desc); CHECK_STR(nb.sys_desc, "picolldp 0.1.0 on test");
+    CHECK(lldp_neighbor_is_picoplug(&nb));
     CHECK(nb.has_caps); CHECK_EQ(nb.caps_enabled, LLDP_CAP_STATION); CHECK_EQ(nb.caps_supported, LLDP_CAP_STATION);
     CHECK_EQ(nb.n_mgmt_addrs, 1);
     CHECK_EQ(nb.mgmt_addrs[0].afi, LLDP_AFI_IPV4);
@@ -173,6 +174,7 @@ static int test_cdp_roundtrip(void)
     CHECK(nb.has_sys_desc); CHECK(strncmp(nb.sys_desc, "picolldp 0.1.0 on test", 22) == 0);
     CHECK(strlen(nb.sys_desc) == 22 || (strlen(nb.sys_desc) == 23 && nb.sys_desc[22] == '\n'));
     CHECK(nb.has_platform); CHECK_STR(nb.platform, "picolldp");
+    CHECK(lldp_neighbor_is_picoplug(&nb));
     CHECK(nb.has_duplex); CHECK(nb.duplex_full);
     CHECK(!nb.has_power_mw); CHECK(!nb.has_power_req_mw);
     CHECK_EQ(nb.n_unknown, 0);

@@ -27,6 +27,9 @@ typedef enum { ST_IDLE, ST_ARP, ST_PING_GW, ST_PING_INET, ST_DNS, ST_WAIT } stat
 
 static struct raw_pcb *ping_pcb;
 static probe_result_t res;
+/* last completed run: shown while the next run is in progress, so the page
+ * keeps its readings instead of blanking them for a couple of seconds */
+static probe_result_t last, view;
 static state_t state;
 static absolute_time_t deadline;       /* current step timeout          */
 static absolute_time_t next_run;
@@ -168,6 +171,7 @@ void probe_poll(void)
     if (!info.bound) {
         if (state != ST_IDLE) {
             memset(&res, 0, sizeof res);
+            memset(&last, 0, sizeof last);
             res.runs = runs;
             state = ST_IDLE;
             ping_waiting = false;
@@ -178,6 +182,7 @@ void probe_poll(void)
     /* a fresh lease (new port?) restarts immediately */
     if (info.leases != last_lease_count) {
         last_lease_count = info.leases;
+        memset(&last, 0, sizeof last);   /* readings from the previous network no longer apply */
         state = ST_IDLE;
         next_run = get_absolute_time();
     }
@@ -240,6 +245,7 @@ void probe_poll(void)
             res.valid = true;
             res.running = false;
             res.completed_at_s = to_ms_since_boot(get_absolute_time()) / 1000u;
+            last = res;
             state = ST_WAIT;
             next_run = make_timeout_time_ms(PROBE_PERIOD_S * 1000);
             printf("probe: gw %s (%u/%u, %u ms), inet %u/%u (%u ms), dns %s\n",
@@ -251,4 +257,12 @@ void probe_poll(void)
     res.phase = phase_name(state);
 }
 
-const probe_result_t *probe_result(void) { return &res; }
+const probe_result_t *probe_result(void)
+{
+    if (res.valid || !last.valid) return &res;
+    view = last;
+    view.running = res.running;
+    view.phase = res.phase;
+    view.runs = res.runs;
+    return &view;
+}

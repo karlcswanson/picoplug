@@ -138,12 +138,13 @@ static int test_cisco(void)
     lldp_format_port_id(&n.port_id, id, sizeof id);
     CHECK_STR(id, "ifname:Gi1/0/12");
     CHECK_EQ(n.ttl, 120);
+    CHECK(!lldp_neighbor_is_picoplug(&n));
     CHECK(n.has_port_desc); CHECK_STR(n.port_desc, "GigabitEthernet1/0/12");
     CHECK(n.has_sys_name);  CHECK_STR(n.sys_name, "sw-core-2");
     CHECK(n.has_sys_desc);
     CHECK(strncmp(n.sys_desc, "Cisco IOS Software, C2960X", 26) == 0);
-    CHECK_EQ(strlen(n.sys_desc), LLDP_MAX_SYS_DESC); /* long desc is cut */
-    CHECK(n.truncated);
+    CHECK_EQ(strlen(n.sys_desc), 246);                /* fits since the limit went to 255 */
+    CHECK(!n.truncated);
     CHECK(n.has_caps);
     CHECK_EQ(n.caps_supported, LLDP_CAP_BRIDGE | LLDP_CAP_ROUTER);
     CHECK_EQ(n.caps_enabled, LLDP_CAP_BRIDGE);
@@ -170,14 +171,9 @@ static int test_cisco(void)
     CHECK(n.med_power.present);
     CHECK_EQ(n.med_power.power_type, 0);
     CHECK_EQ(n.med_power.power_dw, 154);
-    /* Cisco 4-wire TLV is unknown */
-    CHECK_EQ(n.n_unknown, 1);
-    CHECK_EQ(n.n_unknown_stored, 1);
-    CHECK(n.unknown[0].is_org);
-    CHECK_EQ(n.unknown[0].oui[0], 0x00); CHECK_EQ(n.unknown[0].oui[1], 0x01); CHECK_EQ(n.unknown[0].oui[2], 0x42);
-    CHECK_EQ(n.unknown[0].subtype, 1);
-    CHECK_EQ(n.unknown[0].len, 1);
-    CHECK_EQ(n.unknown[0].raw[0], 0x0d);
+    /* Cisco 4-wire PoE (UPOE) flags 0x0d: supported, PD wants spare pair, spare pair on */
+    CHECK(n.has_upoe); CHECK_EQ(n.upoe, 0x0d);
+    CHECK_EQ(n.n_unknown, 0);
     CHECK(n.saw_end);
     CHECK_EQ(n.n_tlvs, 16);
     CHECK(!n.vlan_tagged);
@@ -368,6 +364,70 @@ static int test_vlan_tagged(void)
     return 0;
 }
 
+static size_t from_hex(const char *h, uint8_t *out, size_t cap)
+{
+    size_t n = 0;
+    for (; h[0] && h[1] && n < cap; h += 2) {
+        unsigned b;
+        if (sscanf(h, "%2x", &b) != 1) return 0;
+        out[n++] = (uint8_t)b;
+    }
+    return n;
+}
+
+/* Fields added after checking against Wireshark's and tcpdump's decoders.
+ * Made-up frame: PPVID, protocol identity (with a repeat), management VID,
+ * 802.1 link aggregation, 802.3bt power with PD 4PID set, EEE, MED location
+ * (coordinates, then civic, which replaces it), IANA MUD URL. */
+static int test_extras(void)
+{
+    static const char *full =
+        "0180c200000e02000000000188cc0207040200000000010405056574683106020078fe070080c20206012cfe0d0080c204080026424203000002"
+        "fe0b0080c20406424203000002fe080080c20403880901fe070080c20402888efe070080c204021234fe060080c2060063fe090080c20703000003e9"
+        "fe1d00120f020f02050601fe01fe00000000000000009c0602038400000000fe0e00120f0500110010000000000000fe150012bb0301884ac28f5c8b"
+        "0c0f5c291780000f8001fe370012bb03023102555301024341030853616e204a6f73651303313730060b57205461736d616e2044721b01321c034231"
+        "3280044c61746efe2200005e0168747470733a2f2f6578616d706c652e636f6d2f6d75642f6465766963650000";
+    uint8_t f[MAX_FRAME];
+    size_t len = from_hex(full, f, sizeof f);
+    lldp_neighbor_t n;
+    CHECK_EQ(lldp_parse(f, len, &n), LLDP_OK);
+    CHECK_EQ(n.n_ppvids, 1);
+    CHECK_EQ(n.ppvids[0].id, 300);
+    CHECK(n.ppvids[0].supported && n.ppvids[0].enabled);
+    CHECK_STR(n.protocols, "RSTP, LACP, 802.1X, 0x1234");
+    CHECK(n.has_mgmt_vid); CHECK_EQ(n.mgmt_vid, 99);
+    CHECK(n.has_link_agg && n.link_agg_capable && n.link_agg_active);
+    CHECK_EQ(n.link_agg_port_id, 1001);
+    const lldp_power_mdi_t *p = &n.power_mdi;
+    CHECK(p->dll_present);
+    CHECK_EQ(p->power_priority, 2);              /* 0x06: 4PID bit is not part of the priority */
+    CHECK(p->pd_4pid);
+    CHECK(p->bt_present);
+    CHECK_EQ(p->pse_status, 2); CHECK_EQ(p->pd_status, 1); CHECK_EQ(p->pairs_ext, 3);
+    CHECK_EQ(p->class_ext, 6);
+    CHECK_EQ(p->type_ext, 1);
+    CHECK_EQ(p->pse_max_dw, 900);
+    CHECK(n.has_eee); CHECK_EQ(n.eee_tx_us, 17); CHECK_EQ(n.eee_rx_us, 16);
+    CHECK_EQ(n.location_format, LLDP_LOC_CIVIC);
+    CHECK_STR(n.location, "CA, San Jose, 170, W Tasman Dr, Floor 2, Room B12, US");
+    CHECK_STR(n.mud_url, "https://example.com/mud/device");
+    CHECK_EQ(n.n_unknown, 0);
+    CHECK(!n.truncated);
+
+    len = from_hex("0180c200000e02000000000188cc0207040200000000010405056574683106020078"
+                   "fe150012bb0301884ac28f5c8b0c0f5c291780000f80010000", f, sizeof f);
+    CHECK_EQ(lldp_parse(f, len, &n), LLDP_OK);
+    CHECK_EQ(n.location_format, LLDP_LOC_COORD);
+    CHECK_STR(n.location, "37.38000, -121.97000, 15.5 m");
+
+    len = from_hex("0180c200000e02000000000188cc0207040200000000010405056574683106020078"
+                   "fe0f0012bb0303343038353535313233340000", f, sizeof f);
+    CHECK_EQ(lldp_parse(f, len, &n), LLDP_OK);
+    CHECK_EQ(n.location_format, LLDP_LOC_ELIN);
+    CHECK_STR(n.location, "4085551234");
+    return 0;
+}
+
 static int test_errors(void)
 {
     lldp_neighbor_t n;
@@ -463,8 +523,8 @@ static int test_caps(void)
     };
     memcpy(g + 14, body, sizeof body);
     size_t p = 14 + sizeof body;
-    /* 20 VLAN names */
-    for (int i = 0; i < 20; i++) {
+    /* 40 VLAN names */
+    for (int i = 0; i < 40; i++) {
         g[p++] = 0xfe; g[p++] = 0x09; g[p++] = 0x00; g[p++] = 0x80; g[p++] = 0xc2; g[p++] = 3;
         g[p++] = 0; g[p++] = (uint8_t)i; g[p++] = 2; g[p++] = 'v'; g[p++] = (uint8_t)('0' + i % 10);
     }
@@ -495,7 +555,7 @@ static int test_caps(void)
     lldp_neighbor_t n;
     CHECK_EQ(lldp_parse(g, p, &n), LLDP_OK);
     CHECK_EQ(n.n_vlans, LLDP_MAX_VLANS);
-    CHECK_STR(n.vlans[7].name, "v7");
+    CHECK_STR(n.vlans[LLDP_MAX_VLANS - 1].name, "v1");
     CHECK_EQ(n.n_unknown, 20);
     CHECK_EQ(n.n_unknown_stored, LLDP_MAX_UNKNOWN_TLVS);
     CHECK_EQ(n.unknown[0].len, 40);
@@ -753,6 +813,7 @@ static const test_t TESTS[] = {
     {"lldpd", test_lldpd},
     {"fortiswitch", test_fortiswitch},
     {"vlan_tagged", test_vlan_tagged},
+    {"extras", test_extras},
     {"errors", test_errors},
     {"caps", test_caps},
     {"format", test_format},

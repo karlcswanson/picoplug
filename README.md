@@ -41,7 +41,6 @@ Switch --Ethernet--> W5500 (MACRAW) --SPI--> RP2040 --USB NCM--> phone / laptop 
 * `firmware/src/web/index.html` - the built-in page (embedded at build time)
 * `firmware/test/` - host-side unit tests and a headless-Chrome smoke test of the page
 * `docs/PROTOCOL.md` - JSON schema of `/status.json` and the :9000 stream, HTTP endpoints
-* `docs/HANDOFF.md` - start here on a new machine: toolchain, first steps, feature status
 * `THIRD_PARTY_LICENSES.md` - notices for the bundled Pico SDK, lwIP, TinyUSB, WIZnet ioLibrary and Lucide icons
 
 ## Build
@@ -62,11 +61,12 @@ Hold BOOTSEL while plugging in the board and copy
 `build-w55rp20/picolldp.uf2` to the RPI-RP2 drive. Once running, Setup
 can reboot it into the bootloader for the next update. Host tests:
 `cmake -S firmware/test -B build-test && cmake --build build-test && ctest --test-dir build-test`.
-More in `docs/HANDOFF.md`.
 
 ## Status
 
 Firmware 0.3.2, verified on a W55RP20-EVB-Pico with macOS hosts against
 an FS S3200 and a FortiSwitch-108F; a real Dante PTPv1 master was picked
-up on the bench LAN. iPhone works from the home screen; Android is not
-yet tested. See `docs/HANDOFF.md` for the per-feature state.
+up on the bench LAN. iPhone works from the home screen. Android (moto g play 2026,
+Android 16) gets the link and loads the page with Wi-Fi turned off: with
+Wi-Fi on, Android routes the browser over Wi-Fi and the tester is not
+reachable.

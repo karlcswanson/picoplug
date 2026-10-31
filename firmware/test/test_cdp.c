@@ -100,7 +100,7 @@ static int test_switch(void)
     CHECK_EQ(n.unknown[0].type, 8);
     CHECK_EQ(n.unknown[0].len, 31);
     CHECK_EQ(n.n_tlvs, 16);
-    CHECK(n.truncated);                                 /* long IOS version string */
+    CHECK(!n.truncated);                                /* long IOS version string fits in 255 */
     return 0;
 }
 

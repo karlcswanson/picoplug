@@ -87,8 +87,51 @@ static int writer_tests(void)
     return 0;
 }
 
+/* A buffer too small for every neighbor: the message still closes cleanly,
+ * keeps the neighbors that fit and counts the rest. */
+static int fit_tests(void)
+{
+    static const char *const fixtures[] = {"cisco", "aruba", "juniper", "ubiquiti"};
+    static char buf[STATUS_JSON_MAX];
+    static uint8_t frame[2000];
+    static lldp_neighbor_t n;
+    status_info_t si = {.fw = "test", .uptime_s = 100, .eth_link = true, .usb_connected = true, .seq = 1};
+    jw_t w;
+
+    neighbor_table_init();
+    for (size_t i = 0; i < sizeof fixtures / sizeof fixtures[0]; i++) {
+        size_t len = load_hex(fixtures[i], frame, sizeof frame);
+        CHECK(len > 0 && lldp_parse(frame, len, &n) == LLDP_OK);
+        neighbor_table_update(&n, 90000);
+    }
+    CHECK(neighbor_table_count() == 4);
+
+    jw_init(&w, buf, sizeof buf);                       /* full size: all four, nothing omitted */
+    status_json_build(&w, &si, 100000);
+    CHECK(!jw_overflow(&w));
+    CHECK(!strstr(buf, "neighbors_omitted"));
+    size_t full = jw_len(&w);
+
+    jw_init(&w, buf, full - 200);                       /* the last neighbor no longer fits */
+    status_json_build(&w, &si, 100000);
+    CHECK(!jw_overflow(&w));
+    CHECK(strstr(buf, "\"neighbors_omitted\":1}") != NULL);
+    CHECK(buf[jw_len(&w) - 1] == '}');
+
+    jw_init(&w, buf, 700);                              /* none fit */
+    status_json_build(&w, &si, 100000);
+    CHECK(!jw_overflow(&w));
+    CHECK(strstr(buf, "\"neighbors\":[],\"neighbors_omitted\":4}") != NULL);
+    return 0;
+}
+
 int main(int argc, char **argv)
 {
+    if (argc > 1 && strcmp(argv[1], "fit") == 0) {
+        int rc = fit_tests();
+        fprintf(stderr, "json fit: %s\n", rc ? "FAIL" : "ok");
+        return rc;
+    }
     if (argc > 1 && strcmp(argv[1], "writer") == 0) {
         int rc = writer_tests();
         fprintf(stderr, "json writer: %s\n", rc ? "FAIL" : "ok");

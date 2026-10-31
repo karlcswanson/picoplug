@@ -19,6 +19,7 @@ static uint32_t generation;
 static bool link_was_up;
 static uint8_t burst_left;              /* fast-start frames still to send */
 static absolute_time_t next_lldp, next_cdp;
+static absolute_time_t cdp_peer_until;  /* CDP switch's holdtime runs out */
 
 static uint32_t now_ms(void) { return to_ms_since_boot(get_absolute_time()); }
 
@@ -81,7 +82,25 @@ static void start_burst(void)
 {
     burst_left = ADV_FAST_START_COUNT;
     next_lldp = get_absolute_time();
-    next_cdp = get_absolute_time();
+    next_cdp = st.cdp_peer ? get_absolute_time() : at_the_end_of_time;
+}
+
+static void cdp_peer_lost(void)
+{
+    st.cdp_peer = false;
+    next_cdp = at_the_end_of_time;
+    generation++;
+}
+
+void advertise_cdp_heard(uint16_t holdtime_s)
+{
+    if (!holdtime_s) { if (st.cdp_peer) cdp_peer_lost(); return; }
+    cdp_peer_until = make_timeout_time_ms(holdtime_s * 1000u);
+    if (!st.cdp_peer) {
+        st.cdp_peer = true;
+        next_cdp = get_absolute_time();     /* answer right away */
+        generation++;
+    }
 }
 
 void advertise_init(const uint8_t mac[6])
@@ -100,16 +119,17 @@ void advertise_poll(void)
     if (up != link_was_up) {
         link_was_up = up;
         if (up) start_burst();          /* a new switch port: introduce ourselves */
-        else { next_lldp = next_cdp = at_the_end_of_time; burst_left = 0; }
+        else { next_lldp = next_cdp = at_the_end_of_time; burst_left = 0; st.cdp_peer = false; }
     }
     if (!up) return;
+    if (st.cdp_peer && time_reached(cdp_peer_until)) cdp_peer_lost();
 
     if (st.lldp_enabled && time_reached(next_lldp)) {
         send_lldp(ADV_LLDP_TTL_S);
         if (burst_left) burst_left--;
         next_lldp = make_timeout_time_ms(burst_left ? ADV_FAST_START_MS : ADV_LLDP_INTERVAL_S * 1000u);
     }
-    if (st.cdp_enabled && time_reached(next_cdp)) {
+    if (st.cdp_enabled && st.cdp_peer && time_reached(next_cdp)) {
         send_cdp(ADV_CDP_TTL_S);
         next_cdp = make_timeout_time_ms(ADV_CDP_INTERVAL_S * 1000u);
     }
@@ -118,7 +138,7 @@ void advertise_poll(void)
 void advertise_set_enabled(bool lldp, bool cdp)
 {
     if (st.lldp_enabled && !lldp && link_was_up) send_lldp(0);     /* shutdown LLDPDU */
-    if (st.cdp_enabled && !cdp && link_was_up) send_cdp(0);
+    if (st.cdp_enabled && !cdp && link_was_up && st.cdp_peer) send_cdp(0);
     bool restart = (!st.lldp_enabled && lldp) || (!st.cdp_enabled && cdp);
     st.lldp_enabled = lldp;
     st.cdp_enabled = cdp;

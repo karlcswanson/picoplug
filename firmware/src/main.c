@@ -106,6 +106,7 @@ void fault_report_previous(void);
 
 static void got_neighbor(const lldp_neighbor_t *n)
 {
+    if (n->proto == NEIGHBOR_PROTO_CDP && !lldp_neighbor_is_picoplug(n)) advertise_cdp_heard(n->ttl);
     bool changed = neighbor_table_update(n, now_ms());
     if (changed) {
         printf("%s: neighbor %s (%d in table)\n", n->proto == NEIGHBOR_PROTO_CDP ? "cdp" : "lldp",

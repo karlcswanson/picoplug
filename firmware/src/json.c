@@ -577,6 +577,7 @@ static void write_neighbor_ids(jw_t *w, const lldp_neighbor_t *n)
 {
     char s[LLDP_ID_STR_LEN];
     jw_kv_str(w, "proto", n->proto == NEIGHBOR_PROTO_CDP ? "cdp" : "lldp");
+    if (lldp_neighbor_is_picoplug(n)) jw_kv_bool(w, "picoplug", true);
     lldp_format_chassis_id(&n->chassis_id, s, sizeof s);
     jw_kv_str(w, "chassis_id", s);
     lldp_format_port_id(&n->port_id, s, sizeof s);
@@ -613,6 +614,19 @@ static void write_neighbor_ids(jw_t *w, const lldp_neighbor_t *n)
 static void write_neighbor_vlans(jw_t *w, const lldp_neighbor_t *n)
 {
     if (n->has_pvid) jw_kv_uint(w, "pvid", n->pvid);
+    if (n->has_mgmt_vid) jw_kv_uint(w, "mgmt_vid", n->mgmt_vid);
+    if (n->n_ppvids) {
+        jw_key(w, "ppvids"); jw_arr_begin(w);
+        for (int i = 0; i < n->n_ppvids; i++) {
+            jw_obj_begin(w);
+            jw_kv_uint(w, "id", n->ppvids[i].id);
+            jw_kv_bool(w, "supported", n->ppvids[i].supported);
+            jw_kv_bool(w, "enabled", n->ppvids[i].enabled);
+            jw_obj_end(w);
+        }
+        jw_arr_end(w);
+    }
+    if (n->protocols[0]) jw_kv_str(w, "protocols", n->protocols);
     if (n->n_vlans) {
         jw_key(w, "vlans"); jw_arr_begin(w);
         for (int i = 0; i < n->n_vlans; i++) {
@@ -666,7 +680,38 @@ static void write_neighbor_power(jw_t *w, const lldp_neighbor_t *n)
             jw_key(w, "alloc_w"); jw_fixed(w, p->pse_allocated_dw, 1);
             jw_kv_str(w, "priority", power_priority_str(p->power_priority));
             jw_kv_uint(w, "type", p->power_type);
+            if (p->pd_4pid) jw_kv_bool(w, "pd_4pid", true);
         }
+        if (p->bt_present) {
+            static const char *const pse_st[] = {NULL, "2-pair", "4-pair single", "4-pair dual"};
+            static const char *const pd_st[] = {NULL, "single", "2-pair dual", "4-pair dual"};
+            static const char *const pairs[] = {NULL, "a", "b", "both"};
+            jw_key(w, "bt"); jw_obj_begin(w);
+            if (p->class_ext >= 1 && p->class_ext <= 8) jw_kv_uint(w, "class", p->class_ext);
+            else if (p->class_ext == 15) jw_kv_str(w, "class", "dual");
+            if (p->class_a >= 1 && p->class_a <= 5) jw_kv_uint(w, "class_a", p->class_a);
+            if (p->class_b >= 1 && p->class_b <= 5) jw_kv_uint(w, "class_b", p->class_b);
+            if (p->type_ext <= 5) jw_kv_uint(w, "type", p->type_ext <= 1 ? 3 + p->type_ext : p->type_ext <= 3 ? 3 : 4);
+            if (p->type_ext <= 5) jw_kv_str(w, "device", p->type_ext <= 1 ? "pse" : "pd");
+            if (pse_st[p->pse_status]) jw_kv_str(w, "powering", pse_st[p->pse_status]);
+            if (pd_st[p->pd_status]) jw_kv_str(w, "pd", pd_st[p->pd_status]);
+            if (pairs[p->pairs_ext]) jw_kv_str(w, "pairs", pairs[p->pairs_ext]);
+            if (p->req_a_dw)   { jw_key(w, "req_a_w");   jw_fixed(w, p->req_a_dw, 1); }
+            if (p->req_b_dw)   { jw_key(w, "req_b_w");   jw_fixed(w, p->req_b_dw, 1); }
+            if (p->alloc_a_dw) { jw_key(w, "alloc_a_w"); jw_fixed(w, p->alloc_a_dw, 1); }
+            if (p->alloc_b_dw) { jw_key(w, "alloc_b_w"); jw_fixed(w, p->alloc_b_dw, 1); }
+            if (p->pse_max_dw) { jw_key(w, "max_w");     jw_fixed(w, p->pse_max_dw, 1); }
+            if (p->pd_load) jw_kv_bool(w, "pd_load", true);
+            jw_obj_end(w);
+        }
+        jw_obj_end(w);
+    }
+    if (n->has_upoe) {
+        jw_key(w, "upoe"); jw_obj_begin(w);
+        jw_kv_bool(w, "supported", n->upoe & 0x01);
+        jw_kv_bool(w, "altb_detect", n->upoe & 0x02);
+        jw_kv_bool(w, "spare_desired", n->upoe & 0x04);
+        jw_kv_bool(w, "spare_on", n->upoe & 0x08);
         jw_obj_end(w);
     }
     if (n->med_power.present) {
@@ -690,6 +735,12 @@ static void write_neighbor_phy(jw_t *w, const lldp_neighbor_t *n)
         jw_obj_end(w);
     }
     if (n->has_max_frame) jw_kv_uint(w, "max_frame", n->max_frame_size);
+    if (n->has_eee) {
+        jw_key(w, "eee"); jw_obj_begin(w);
+        jw_kv_uint(w, "tx_us", n->eee_tx_us);
+        jw_kv_uint(w, "rx_us", n->eee_rx_us);
+        jw_obj_end(w);
+    }
     if (n->has_link_agg) {
         jw_key(w, "link_agg"); jw_obj_begin(w);
         jw_kv_bool(w, "capable", n->link_agg_capable);
@@ -714,6 +765,14 @@ static void write_neighbor_phy(jw_t *w, const lldp_neighbor_t *n)
         jw_kv_uint(w, "device_type", n->med_device_type);
         jw_obj_end(w);
     }
+    if (n->location_format && n->location[0]) {
+        jw_key(w, "location"); jw_obj_begin(w);
+        jw_kv_str(w, "format", n->location_format == LLDP_LOC_COORD ? "coordinates" :
+                               n->location_format == LLDP_LOC_CIVIC ? "civic" : "elin");
+        jw_kv_str(w, "text", n->location);
+        jw_obj_end(w);
+    }
+    if (n->mud_url[0]) jw_kv_str(w, "mud_url", n->mud_url);
 }
 
 /* ---- neighbor: CDP-only fields ---- */
@@ -874,6 +933,7 @@ if (si->tx_present) {
     jw_obj_end(w);
     jw_key(w, "cdp"); jw_obj_begin(w);
     jw_kv_bool(w, "enabled", si->tx_cdp_on);
+    jw_kv_bool(w, "peer", si->tx_cdp_peer);
     jw_kv_uint(w, "frames", si->tx_cdp_frames);
     if (si->tx_cdp_age_s != UINT32_MAX) jw_kv_uint(w, "age_s", si->tx_cdp_age_s);
     jw_obj_end(w);
@@ -918,13 +978,24 @@ void status_json_build(jw_t *w, const status_info_t *si, uint32_t now_ms)
 
     write_tx(w, si);
 
+    /* Neighbors last, and only as many as fit: a message that overflows is
+     * dropped whole, so leave out the neighbors that do not fit instead and
+     * say how many. 48 bytes stays free for the closing brackets. */
     jw_key(w, "neighbors"); jw_arr_begin(w);
-    int count = neighbor_table_count();
+    int count = neighbor_table_count(), omitted = 0;
     for (int i = 0; i < count; i++) {
         const neighbor_entry_t *e = neighbor_table_get(i);
-        if (e) write_neighbor(w, e, now_ms);
+        if (!e) continue;
+        jw_t before = *w;
+        if (!omitted) write_neighbor(w, e, now_ms);
+        if (omitted || w->pos + 48 > w->cap) {
+            *w = before;
+            if (w->pos < w->cap) w->buf[w->pos] = '\0';
+            omitted++;
+        }
     }
     jw_arr_end(w);
+    if (omitted) jw_kv_uint(w, "neighbors_omitted", (uint32_t)omitted);
 
     jw_obj_end(w);
 }

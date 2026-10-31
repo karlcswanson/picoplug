@@ -130,13 +130,13 @@ typedef struct {
     uint32_t    link_up_for_s;     /* for "stp": seconds since link-up, 0 = down */
     /* our own advertisements; tx_present = emit the "tx" object */
     bool        tx_present;
-    bool        tx_lldp_on, tx_cdp_on;
+    bool        tx_lldp_on, tx_cdp_on, tx_cdp_peer;
     uint32_t    tx_lldp_frames, tx_cdp_frames;
     uint32_t    tx_lldp_age_s, tx_cdp_age_s;   /* UINT32_MAX = never sent */
 } status_info_t;
 
 /* Suggested buffer size for one status message with NEIGHBOR_MAX entries. */
-#define STATUS_JSON_MAX 6144
+#define STATUS_JSON_MAX 8192
 
 /*
  * Write one {"type":"status",...} object (no trailing newline) describing

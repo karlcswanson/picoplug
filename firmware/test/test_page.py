@@ -246,9 +246,9 @@ def main():
         # --- case 4: 802.1X port, no DHCP yet, blinker running
         load(4)
         text = cdp.js("document.body.innerText")
-        check("802.1x" in text.lower() and "asks for authentication" in text, "802.1X row present")
+        check("802.1x" in text.lower() and "auth requested" in text, "802.1X row present")
         check("EAP identity" in text and "2 requests" in text and "every 30 s" in text, "802.1X row details: " + text[text.lower().find("802.1x"):][:160].replace("\n", " | "))
-        check("will not pass DHCP until a client authenticates" in text, "DHCP row explains the 802.1X block")
+        check("will not pass DHCP" not in text, "no explanation of the DHCP result: the page states facts only")
         cdp.js("window.copyText=t=>{window.__copied=t}")
         check(tap('Authenticator') == '64:9d:99:32:7e:90', '802.1X card copies the authenticator MAC')
         check(cdp.js("document.getElementById('t_blink').textContent") == "Stop blinking", "blink button shows the stop label while active")
@@ -263,7 +263,7 @@ def main():
         cdp.js("window.copyText=t=>{window.__copied=t}")
         check("igmp querier" in text.lower() and "192.168.109.1" in text and "every 125 s" in text, "IGMP querier row")
         check("· the gateway" in text and "IGMPv3" in text and "robustness 2" in text and "answer within 10 s" in text, "IGMP querier identified and v3 details shown")
-        check("3 reports from other hosts" in text and "snooping is probably off" in text, "snooping hint from stray reports")
+        check("3 reports from others" in text and "probably" not in text, "stray reports counted, no snooping guess")
         check("multicast router" in text.lower() and "PIM hello" in text and "DR priority 1" in text and "hold 105 s" in text, "multicast router row")
         got = tap('Multicast router')
         check(got == '192.168.109.1', 'multicast router row copies its address, got ' + repr(got))
@@ -287,8 +287,8 @@ def main():
         # --- case 6: an LACP port-channel member the switch holds out of the bundle
         load(6)
         text = cdp.js("document.body.innerText")
-        check("held out of the bundle" in text and "every 1 s" in text and "key 2" in text and "port 7" in text, "port-channel row with LACP details")
-        check("LACP port channel" in text and cdp.js("!!document.querySelector('#pc-dot1x.empty')"), "DHCP hint blames the port channel")
+        check("not forwarding" in text and "every 1 s" in text and "key 2" in text and "port 7" in text, "port-channel row with LACP details")
+        check("LACP port channel" not in text and "Use a port outside" not in text and cdp.js("!!document.querySelector('#pc-dot1x.empty')"), "no DHCP hint or advice about the port channel")
         cdp.js("window.copyText=t=>{window.__copied=t}")
         check(tap('LACP') == '2', 'port-channel card copies the LACP key')
 
@@ -296,8 +296,8 @@ def main():
         load(7)
         text = cdp.js("document.body.innerText")
         check("other probes" in text.lower() and "02:50:43:aa:bb:02" in text and "same switch" in text and "mgi7" in text, "peer row names the shared switch and its port")
-        check("there," in text and "here" in text, "peer row flags a PVID mismatch")
-        check("Through a switch" in text and "31 s" in text and "edge / portfast" in text, "switched verdict with the slow-return hint")
+        check("PVID 10" in text and "there," not in text, "peer row shows its PVID without flagging it")
+        check("link stayed up" in text and "back after 31 s" in text and "31 s" in text and "portfast" not in text and "Through a switch" not in text, "path test states what the link did, no verdict or hint")
         check("5 other source MACs heard" in text, "other-devices count")
         check(cdp.js("!!document.querySelector('#proto [data-path]')"), "Test path button present when idle")
         check(cdp.js("document.querySelector('#hprobe .pb2')?.textContent") == "2", "header shows this unit's probe badge, red for 2")
@@ -307,15 +307,15 @@ def main():
         # --- case 8: a bare cable between two probes
         load(8)
         text = cdp.js("document.body.innerText")
-        check("Direct cable" in text and "down 5.2 s" in text, "direct verdict")
+        check("link dropped" in text and "down 5.2 s" in text and "Direct cable" not in text, "path test: link dropped with the other probe")
         cdp.call("Emulation.setDeviceMetricsOverride", width=375, height=800, deviceScaleFactor=1, mobile=True)
         for i in (7, 8):
             load(i)
             sw = cdp.js("document.documentElement.scrollWidth")
             check(sw <= 375, f"case {i}: no horizontal overflow at 375 px (scrollWidth {sw})")
         cdp.call("Emulation.clearDeviceMetricsOverride")
-        check("its LLDP neighbor is this probe" in text, "peer that sees us as its neighbor")
-        check("nothing but probes on this wire" in text, "no other MACs on a bare cable")
+        check("neighbor: this probe" in text, "peer that sees us as its neighbor")
+        check("Other devices" in text and "none heard" in text and "nothing but probes" not in text, "no other MACs on a bare cable, stated plainly")
 
         # --- case 9: link up, nothing heard yet
         # --- form link: a button on the Port tab with the neighbor filled into the Setup template
@@ -338,17 +338,41 @@ def main():
 
         load(9)
         text = cdp.js("document.body.innerText")
-        check("Listening for LLDP and CDP" in text and cdp.js("document.getElementById('hstat').textContent") == "Listening… 18 s", "listening state")
+        check("Listening" in text and "LLDP · CDP" in text and cdp.js("document.getElementById('hstat').textContent") == "Listening… 18 s", "listening state")
         # --- case 10: neighbor past half its TTL
         load(10)
         text = cdp.js("document.body.innerText")
-        check(cdp.js("!!document.querySelector('.card.nb.stale')") and "Clear and listen again" in text and "stale" in cdp.js("document.getElementById('hstat').textContent"), "stale neighbor state")
+        check(cdp.js("!!document.querySelector('.card.nb.stale')") and "Relisten" in text and "stale" in cdp.js("document.getElementById('hstat').textContent"), "stale neighbor state")
 
         # --- case 11: a Mac running lldpd: MAC as port ID, interface name in the description
         load(11)
         check(cdp.js("document.querySelector('#list .port').textContent") == "en10", "host neighbor shows the interface name, not the MAC")
         check(cdp.js("!!document.querySelector('#list use[href=\"#i-laptop\"]')"), "host neighbor gets the laptop icon")
         check("en10" in cdp.js("document.getElementById('hstat').textContent"), "header line names the interface")
+
+        # --- case 12: only another picoplug's CDP, flooded through a switch that does not run CDP
+        load(12)
+        text = cdp.js("document.body.innerText")
+        check("Another picoplug" in text, "picoplug neighbor is identified")
+        check(cdp.js("!!document.querySelector('#list use[href=\"#i-probes\"]')"), "picoplug neighbor gets the probes icon")
+        check(cdp.js("document.getElementById('hstat').textContent") == "No switch · picoplug-3", "header does not name the picoplug as the switch port")
+        check(cdp.js("!document.getElementById('formbtn')"), "no form button for a picoplug neighbor")
+        check(not any(e.get("sys_name") == "picoplug-3" for e in json.loads(cdp.js("localStorage.getItem('piccolldp.history.v1')") or "[]")), "picoplug neighbor kept out of the port log")
+        cdp.js("location.hash='#setup'"); time.sleep(0.6)
+        check("no CDP switch" in cdp.js("document.getElementById('s_cdpn').textContent"), "Setup says no CDP switch heard")
+        cdp.js("location.hash='#port'"); time.sleep(0.3)
+
+        # --- case 13: fields checked against Wireshark/tcpdump: 802.3bt PoE, mgmt VLAN, protocols, EEE, location, MUD URL
+        cdp.call("Emulation.setDeviceMetricsOverride", width=375, height=800, deviceScaleFactor=1, mobile=True)
+        load(13)
+        cdp.js("document.querySelector('#list [data-more]').click()"); time.sleep(0.3)
+        text = cdp.js("document.getElementById('list').innerText")
+        for want in ("Class 6", "4-pair", "Mgmt VLAN", "99", "Protocol VLANs", "300", "RSTP, LACP, 802.1X, 0x1234",
+                     "tx 17 µs", "Floor 2, Room B12", "example.com/mud", "member of aggregate 1001"):
+            check(want in text, f"extras: {want!r} shown")
+        sw = cdp.js("document.documentElement.scrollWidth")
+        check(sw <= 375, f"extras: no horizontal overflow at 375 px (scrollWidth {sw})")
+        cdp.call("Emulation.clearDeviceMetricsOverride")
 
         # --- keepalive: lost replies show the reconnecting line and dim the page; a reply clears it
         cdp.call("Network.enable")

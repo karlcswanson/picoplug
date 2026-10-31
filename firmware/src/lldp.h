@@ -28,9 +28,9 @@ extern "C" {
 #define LLDP_MAX_ID_LEN         64   /* chassis/port ID raw bytes            */
 #define LLDP_MAX_PORT_DESC      64
 #define LLDP_MAX_SYS_NAME       64
-#define LLDP_MAX_SYS_DESC       192
+#define LLDP_MAX_SYS_DESC       255
 #define LLDP_MAX_MGMT_ADDRS     4
-#define LLDP_MAX_VLANS          8
+#define LLDP_MAX_VLANS          32
 #define LLDP_MAX_VLAN_NAME      32
 #define LLDP_MAX_MED_POLICIES   4
 #define LLDP_MAX_UNKNOWN_TLVS   8    /* unknown TLVs kept with raw bytes     */
@@ -38,6 +38,10 @@ extern "C" {
 #define LLDP_MAX_INV            32   /* inventory strings (serial, model, ...) */
 #define LLDP_MAX_VTP_DOMAIN     32   /* CDP VTP domain                       */
 #define LLDP_UNKNOWN_RAW_CAP    32   /* raw bytes kept per unknown TLV       */
+#define LLDP_MAX_PPVIDS         4    /* 802.1 port and protocol VLAN IDs     */
+#define LLDP_MAX_PROTOCOLS      47   /* 802.1 protocol identity names, ", "-joined */
+#define LLDP_MAX_LOCATION       95   /* LLDP-MED location, formatted         */
+#define LLDP_MAX_MUD_URL        95   /* IANA MUD URL (RFC 8520)              */
 
 /* Size of a buffer that can hold any output of lldp_format_id(). */
 #define LLDP_ID_STR_LEN         (8 + 3 * LLDP_MAX_ID_LEN + 1)
@@ -177,9 +181,32 @@ typedef struct {
     uint8_t  power_type;             /* 0 Type 2 PSE, 1 Type 2 PD, 2 Type 1 PSE, 3 Type 1 PD */
     uint8_t  power_source;
     uint8_t  power_priority;         /* 0 unknown 1 critical 2 high 3 low   */
+    bool     pd_4pid;                /* PD supports powering on both pairs  */
     uint16_t pd_requested_dw;        /* deciwatts                           */
     uint16_t pse_allocated_dw;       /* deciwatts                           */
+    /* 802.3bt extension (valid when bt_present) */
+    bool     bt_present;
+    uint16_t req_a_dw, req_b_dw;     /* dual-signature PD request per mode  */
+    uint16_t alloc_a_dw, alloc_b_dw; /* PSE allocation per alternative      */
+    uint8_t  pse_status;             /* 1 2-pair, 2 4-pair single sig, 3 4-pair dual sig */
+    uint8_t  pd_status;              /* 1 single sig, 2 2-pair dual, 3 4-pair dual */
+    uint8_t  pairs_ext;              /* 1 alt A, 2 alt B, 3 both            */
+    uint8_t  class_a, class_b;       /* dual-signature class per mode, 1..5 */
+    uint8_t  class_ext;              /* 1..8, 15 = dual signature           */
+    uint8_t  type_ext;               /* 0 T3 PSE, 1 T4 PSE, 2 T3 ss PD, 3 T3 ds PD, 4 T4 ss PD, 5 T4 ds PD */
+    bool     pd_load;
+    uint16_t pse_max_dw;             /* PSE maximum available power         */
 } lldp_power_mdi_t;
+
+/* IEEE 802.1 Port and Protocol VLAN ID (subtype 2) */
+typedef struct {
+    uint16_t id;
+    bool     supported;
+    bool     enabled;
+} lldp_ppvid_t;
+
+/* LLDP-MED Location Identification (subtype 3) data formats */
+enum { LLDP_LOC_NONE = 0, LLDP_LOC_COORD = 1, LLDP_LOC_CIVIC = 2, LLDP_LOC_ELIN = 3 };
 
 /* LLDP-MED Network Policy (subtype 2) */
 typedef struct {
@@ -255,7 +282,26 @@ typedef struct {
     bool     has_max_frame;
     uint16_t max_frame_size;
 
-    /* IEEE 802.3 Link Aggregation (subtype 3) */
+    /* IEEE 802.1: management VLAN (subtype 6), protocol VLANs (2),
+     * protocol identity (4) as names, e.g. "RSTP, LACP, 802.1X" */
+    bool     has_mgmt_vid;
+    uint16_t mgmt_vid;
+    uint8_t  n_ppvids;
+    lldp_ppvid_t ppvids[LLDP_MAX_PPVIDS];
+    char     protocols[LLDP_MAX_PROTOCOLS + 1];
+
+    /* IEEE 802.3 Energy-Efficient Ethernet (subtype 5): wake times in us */
+    bool     has_eee;
+    uint16_t eee_tx_us, eee_rx_us;
+
+    /* Cisco 4-pair PoE (00-01-42 subtype 1): raw flag bits */
+    bool     has_upoe;
+    uint8_t  upoe;
+
+    /* IANA MUD URL (00-00-5e subtype 1). Empty string = not sent. */
+    char     mud_url[LLDP_MAX_MUD_URL + 1];
+
+    /* Link Aggregation: IEEE 802.3 subtype 3, or its successor 802.1 subtype 7 */
     bool     has_link_agg;
     bool     link_agg_capable, link_agg_active;
     uint32_t link_agg_port_id;
@@ -273,6 +319,8 @@ typedef struct {
     uint8_t  n_med_policies;
     lldp_med_policy_t med_policies[LLDP_MAX_MED_POLICIES];
     lldp_med_power_t  med_power;
+    uint8_t  location_format;        /* LLDP_LOC_*                          */
+    char     location[LLDP_MAX_LOCATION + 1];
 
     /* CDP only */
     uint8_t  cdp_version;
@@ -318,6 +366,14 @@ const char *lldp_result_str(lldp_result_t r);
  */
 size_t lldp_format_chassis_id(const lldp_id_t *id, char *buf, size_t buflen);
 size_t lldp_format_port_id(const lldp_id_t *id, char *buf, size_t buflen);
+
+/*
+ * True when the neighbor is another picoplug (system description or CDP
+ * platform starting with "picoplug", or "picolldp" from firmware before
+ * the rename). Its frames reached us through a switch that floods them,
+ * so it is not this port's switch.
+ */
+bool lldp_neighbor_is_picoplug(const lldp_neighbor_t *n);
 
 /* Format a network address (IPv4 dotted, IPv6 RFC 5952, MAC, or hex). */
 size_t lldp_format_addr(uint8_t afi, const uint8_t *addr, uint8_t len,

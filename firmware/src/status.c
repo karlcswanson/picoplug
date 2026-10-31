@@ -111,7 +111,7 @@ size_t status_render(char *buf, size_t cap, uint32_t seq)
         .self_mac = app_eth_mac(),
         .link_up_for_s = app_link_up_for_ms() / 1000u,
         .tx_present = true,
-        .tx_lldp_on = adv.lldp_enabled, .tx_cdp_on = adv.cdp_enabled,
+        .tx_lldp_on = adv.lldp_enabled, .tx_cdp_on = adv.cdp_enabled, .tx_cdp_peer = adv.cdp_peer,
         .tx_lldp_frames = adv.lldp_frames, .tx_cdp_frames = adv.cdp_frames,
         .tx_lldp_age_s = adv.lldp_last_ms ? (now - adv.lldp_last_ms) / 1000u : UINT32_MAX,
         .tx_cdp_age_s = adv.cdp_last_ms ? (now - adv.cdp_last_ms) / 1000u : UINT32_MAX,

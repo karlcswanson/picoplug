@@ -47,6 +47,7 @@ the corresponding TLV.
 | `tx` | object | What the device itself advertises on the Ethernet port (LLDP/CDP transmit), see below. |
 | `stp` | object | Spanning-tree BPDUs heard on the port, see below. |
 | `neighbors` | array | Zero or more neighbor objects, newest-first is *not* guaranteed. |
+| `neighbors_omitted` | int | Neighbors left out because the message would not fit its 8 KB buffer; absent when all are included. The rest of the message is always complete. |
 
 ## Port object
 
@@ -78,7 +79,7 @@ What the device learned by acting like a normal host on the switch port.
 | `dhcp.truncated` | bool | Present when a string or list above was cut. |
 | `probe.phase` | string | `idle`, `arp`, `ping_gw`, `ping_inet`, `dns`, `done`. |
 | `probe.running`, `probe.runs` | bool, int | The probe repeats every 30 s while a lease is held. |
-| `probe.age_s` | int | Seconds since the last completed run. Present only after the first run, as are the three objects below. |
+| `probe.age_s` | int | Seconds since the last completed run. Present only after the first run, as are the three objects below. While a later run is in progress they keep the last completed run's values; they are cleared when the lease is lost or a new one arrives. |
 | `probe.gateway` | object | `arp` (bool), `mac`, `reachable`, `sent`, `replies`, `rtt_ms` (best of 3 ICMP echoes). |
 | `probe.internet` | object | Same for `target` (1.1.1.1 unless changed in settings). |
 | `probe.dns` | object | `name`, `ok`, `addr`, `ms`, `server` (resolver the lookup went to), `custom` (true when that resolver came from settings rather than DHCP). |
@@ -94,9 +95,16 @@ start on link-up or re-enable) and CDPv2 (every 60 s, holdtime 180)
 frames, identifying itself as `picoplug` (`picoplug-N` with a probe number set), an LLDP-MED class III endpoint,
 so that switches list it and reply with their MED TLVs. Set with `GET /tx`.
 
+LLDP is always sent: bridges never forward it. CDP is sent only while a
+CDP neighbor that is not another picoplug is heard, from its first frame
+until its holdtime runs out, the same rule lldpd uses. A switch that does
+not run CDP floods it like any multicast, so unprompted CDP would reach
+testers on other ports and look like their switch.
+
 | Field | Type | Notes |
 |-------|------|-------|
 | `lldp.enabled`, `cdp.enabled` | bool | Transmit on/off per protocol. |
+| `cdp.peer` | bool | A CDP switch is heard, so CDP is actually going out. |
 | `lldp.frames`, `cdp.frames` | int | Frames sent since boot. |
 | `lldp.age_s`, `cdp.age_s` | int | Seconds since the last frame; absent if none sent yet. |
 
@@ -334,6 +342,7 @@ Every field the LLDP parser decoded. Absent means the TLV was not present.
 | Field | Type | Source TLV |
 |-------|------|------------|
 | `proto` | string | `"lldp"` or `"cdp"`. CDP neighbors fill the same fields where they map: device ID becomes `chassis_id` (`local:...`), port ID becomes `port_id` (`ifname:...`), native VLAN becomes `pvid`, the VoIP VLAN becomes `voice_vlan`, software version becomes `sys_desc`. |
+| `picoplug` | bool | Present (true) when the neighbor is another picoplug (system description or CDP platform starting with `picoplug`, or `picolldp` from older firmware). Its frames came through a switch that passed them along, so it is not this port's switch. |
 | `cdp_version`, `cdp_caps`, `checksum_ok` | int, [string], bool | CDP only. `cdp_caps` are the raw CDP capability names (`router switch host phone igmp ...`); `checksum_ok` appears only when false. |
 | `platform`, `vtp_domain`, `duplex`, `mtu` | string, string, string, int | CDP Platform, VTP domain, Duplex (`full`/`half`), MTU. |
 | `cdp_power` | {`consumption_w`,`requested_w`,`available_w`} | CDP Power, Power Request and Power Available TLVs in watts. |
@@ -343,21 +352,28 @@ Every field the LLDP parser decoded. Absent means the TLV was not present.
 | `frame_vlan` | int | Only if the frame carried an 802.1Q tag. |
 | `port_desc` | string | Port Description (4) |
 | `sys_name` | string | System Name (5) |
-| `sys_desc` | string | System Description (6), cut at 192 bytes (`truncated` set). |
+| `sys_desc` | string | System Description (6), cut at 255 bytes (`truncated` set). |
 | `caps` | [string] | Enabled System Capabilities (7): `other repeater bridge wlan_ap router telephone docsis station cvlan svlan tpmr`. |
 | `caps_supported` | [string] | Supported capabilities. |
 | `mgmt_addr` | [string] | Management Address (8): IPv4 dotted, IPv6 RFC 5952, or `afiN:hex`. Up to 4. |
 | `pvid` | int | 802.1 Port VLAN ID. |
-| `vlans` | [{`id`,`name`}] | 802.1 VLAN Name TLVs, up to 8. |
+| `mgmt_vid` | int | 802.1 Management VID. |
+| `ppvids` | [{`id`,`supported`,`enabled`}] | 802.1 Port and Protocol VLAN IDs, up to 4. |
+| `protocols` | string | 802.1 Protocol Identity TLVs, named and comma-joined (`STP`/`RSTP`/`MSTP`, `LACP`, `802.1X`, `LLDP`, `CDP`, `PVST+`, …); others as `0x` EtherType or `LLC 0x` SAP. Repeats are listed once. |
+| `vlans` | [{`id`,`name`}] | 802.1 VLAN Name TLVs, up to 32. |
 | `voice_vlan` | {`id`,`tagged`,`priority`,`dscp`,`unknown_policy?`} | LLDP-MED Network Policy with application type *voice*. |
 | `med_policies` | [{`app`,`id`,`tagged`,`priority`,`dscp`}] | All MED network policies (up to 4). `app` is `voice`, `voice_signaling`, `guest_voice`, …. |
-| `poe` | object | 802.3 Power via MDI. `port_class`: `pse`/`pd`; `supported`, `enabled`: bool; `pairs`: `signal`/`spare`; `class`: 0–4; with 802.3at extension: `req_w`, `alloc_w` (decimal watts), `priority` (`critical`/`high`/`low`/`unknown`), `type` (0 Type 2 PSE, 1 Type 2 PD, 2 Type 1 PSE, 3 Type 1 PD). |
+| `poe` | object | 802.3 Power via MDI. `port_class`: `pse`/`pd`; `supported`, `enabled`: bool; `pairs`: `signal`/`spare`; `class`: 0–4; with 802.3at extension: `req_w`, `alloc_w` (decimal watts), `priority` (`critical`/`high`/`low`/`unknown`), `type` (0 Type 2 PSE, 1 Type 2 PD, 2 Type 1 PSE, 3 Type 1 PD), `pd_4pid` (true when the PD supports power on both pairs). With the 802.3bt extension, `bt`: `class` (1–8, or `"dual"`), `class_a`/`class_b` (dual-signature, 1–5), `type` (3 or 4), `device` (`pse`/`pd`), `powering` (`2-pair`/`4-pair single`/`4-pair dual`), `pd` (`single`/`2-pair dual`/`4-pair dual`), `pairs` (`a`/`b`/`both`), `req_a_w`, `req_b_w`, `alloc_a_w`, `alloc_b_w`, `max_w`, `pd_load`; each only when sent non-zero. |
+| `upoe` | {`supported`,`altb_detect`,`spare_desired`,`spare_on`} | Cisco 4-pair PoE TLV (OUI 00-01-42 subtype 1). |
 | `med_power` | {`source`,`w`,`priority`} | LLDP-MED Extended Power via MDI. |
 | `mac_phy` | {`autoneg_supported`,`autoneg_enabled`,`pmd_adv`,`mau_type`} | 802.3 MAC/PHY. `mau_type` per RFC 4836 (16 = 100BASE-TX FD, 30 = 1000BASE-T FD). |
 | `max_frame` | int | 802.3 Maximum Frame Size. |
-| `link_agg` | {`capable`,`active`,`port_id`} | 802.3 Link Aggregation. `port_id` only when the port is in an aggregate. |
+| `eee` | {`tx_us`,`rx_us`} | 802.3 Energy-Efficient Ethernet wake times, µs. |
+| `link_agg` | {`capable`,`active`,`port_id`} | Link Aggregation, from the 802.1 TLV (subtype 7) or the older 802.3 one (subtype 3). `port_id` only when the port is in an aggregate. |
 | `inventory` | {`serial`,`model`,`manufacturer`,`hw`,`fw`,`sw`,`asset`} | LLDP-MED inventory TLVs (subtypes 5-11), or a vendor TLV carrying the same: FortiSwitch serial (OUI 08-5b-0e subtype 2). Only the fields sent. |
 | `med` | {`caps`,`device_type`} | LLDP-MED Capabilities. |
+| `location` | {`format`,`text`} | LLDP-MED Location. `format`: `coordinates` (text `lat, long[, alt m]`), `civic` (address elements in the order sent, then country) or `elin`. |
+| `mud_url` | string | IANA MUD URL (RFC 8520, OUI 00-00-5e subtype 1). |
 | `unknown_tlvs` | int | TLVs the parser did not decode (vendor OUIs, MED inventory, …). |
 | `truncated` | bool | Some field was cut to fit a fixed buffer. |
 | `ttl` | int | TTL from the last frame. |
@@ -383,7 +399,7 @@ Strings are ASCII; any byte outside 0x20–0x7E is escaped as `\u00XX`.
 | `GET /manifest.json` | Web-app manifest (`display: standalone`). |
 | `GET /reboot` | Restart the firmware. |
 | `GET /reboot?bootsel=1` | Restart into the USB bootloader (RPI-RP2 volume). |
-| `GET /tx` | Read the transmit state: `{"ok":true,"lldp":true,"cdp":true,"lldp_frames":9,"cdp_frames":2}`. |
+| `GET /tx` | Read the transmit state: `{"ok":true,"lldp":true,"cdp":true,"cdp_peer":false,"lldp_frames":9,"cdp_frames":0}`. |
 | `GET /tx?lldp=0|1&cdp=0|1` | Enable/disable each protocol. Disabling sends a shutdown frame (TTL 0); re-enabling starts a fast-start burst. The choice is saved to flash and used at the next boot. |
 | `GET /tool` | Tool state: `{"ok":true,"error":"","kind":"idle","running":false,"blink":false}`. |
 | `GET /tool?ping=HOST[&count=N]`, `GET /tool?trace=HOST`, `GET /tool?stop=1` | Start a ping (N 1..60, default 5, 0 = continuous until `stop=1` or 15 minutes) or a traceroute to an IPv4 literal or DNS name, or stop the running one. Same reply shape; status 400 and `error` when it cannot start (`the port has no address yet (DHCP checking)`, `a tool is already running; stop it first`, bad host or count). Results arrive in the `tool` object of `/status.json`. |
