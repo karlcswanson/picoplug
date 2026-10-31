@@ -37,21 +37,40 @@ option(USB_TRACE "Capture TinyUSB's debug log (level 2) in a RAM buffer read ove
 
 set(IOLIB ${CMAKE_CURRENT_LIST_DIR}/lib/ioLibrary_Driver/Ethernet)
 
+# The viewer page is the Svelte app in web/, built by npm into one file, web/dist/index.html.
+find_program(NPM npm REQUIRED)
+set(WEB_DIR ${CMAKE_CURRENT_LIST_DIR}/web)
+if(NOT EXISTS ${WEB_DIR}/node_modules)
+    execute_process(COMMAND ${NPM} ci WORKING_DIRECTORY ${WEB_DIR} COMMAND_ERROR_IS_FATAL ANY)
+endif()
+file(GLOB_RECURSE WEB_SRC CONFIGURE_DEPENDS ${WEB_DIR}/src/*)
+set(WEB_INDEX ${WEB_DIR}/dist/index.html)
+add_custom_command(
+    OUTPUT ${WEB_INDEX}
+    COMMAND ${NPM} run build
+    WORKING_DIRECTORY ${WEB_DIR}
+    DEPENDS ${WEB_SRC} ${WEB_DIR}/index.html ${WEB_DIR}/vite.config.js ${WEB_DIR}/package-lock.json
+    COMMENT "Building the viewer page")
+
 # Embed the viewer page, its icon and the web-app manifest as C arrays.
 set(EMBED_HDRS)
 foreach(_f index.html:index_html icon.png:icon_png manifest.json:manifest_json)
     string(REPLACE ":" ";" _p ${_f})
     list(GET _p 0 _file)
     list(GET _p 1 _sym)
+    set(_in ${CMAKE_CURRENT_LIST_DIR}/src/web/${_file})
+    if(_file STREQUAL "index.html")
+        set(_in ${WEB_INDEX})
+    endif()
     set(_hdr ${CMAKE_CURRENT_BINARY_DIR}/generated/${_sym}.h)
     add_custom_command(
         OUTPUT ${_hdr}
         COMMAND ${CMAKE_COMMAND} -E make_directory ${CMAKE_CURRENT_BINARY_DIR}/generated
-        COMMAND ${CMAKE_COMMAND} -DIN=${CMAKE_CURRENT_LIST_DIR}/src/web/${_file}
+        COMMAND ${CMAKE_COMMAND} -DIN=${_in}
                 -DOUT=${_hdr} -DNAME=${_sym}
                 -P ${CMAKE_CURRENT_LIST_DIR}/tools/bin2c.cmake
-        DEPENDS src/web/${_file} tools/bin2c.cmake
-        COMMENT "Embedding src/web/${_file}")
+        DEPENDS ${_in} tools/bin2c.cmake
+        COMMENT "Embedding ${_in}")
     list(APPEND EMBED_HDRS ${_hdr})
 endforeach()
 set(INDEX_HTML_H ${EMBED_HDRS})

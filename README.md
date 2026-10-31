@@ -38,7 +38,7 @@ Switch --Ethernet--> W5500 (MACRAW) --SPI--> RP2040 --USB NCM--> phone / laptop 
 ```
 
 * `firmware/` - Pico SDK + TinyUSB + lwIP firmware (C)
-* `firmware/src/web/index.html` - the built-in page (embedded at build time)
+* `firmware/web/` - the built-in page, a Svelte app built to one file and embedded at build time
 * `firmware/test/` - host-side unit tests and a headless-Chrome smoke test of the page
 * `docs/PROTOCOL.md` - JSON schema of `/status.json` and the :9000 stream, HTTP endpoints
 * `THIRD_PARTY_LICENSES.md` - notices for the bundled Pico SDK, lwIP, TinyUSB, WIZnet ioLibrary and Lucide icons

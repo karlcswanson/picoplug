@@ -12,7 +12,7 @@
 #include "eth_net.h"
 #include "probe.h"
 #include "neighbor_table.h"
-#include "index_html.h"     /* generated from src/web/index.html */
+#include "index_html.h"     /* generated from web/dist/index.html */
 #include "icon_png.h"       /* generated from src/web/icon.png */
 #include "manifest_json.h"  /* generated from src/web/manifest.json */
 

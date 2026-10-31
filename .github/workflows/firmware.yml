@@ -52,6 +52,17 @@ jobs:
           path: firmware/lib/.picotool
           key: picotool-${{ hashFiles('.gitmodules') }}-${{ runner.os }}-sdk-2.3.1
 
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: firmware/web/package-lock.json
+
+      - name: Viewer page
+        run: |
+          npm ci --prefix firmware/web
+          npm run build --prefix firmware/web
+
       - name: Host tests
         run: |
           cmake -S firmware/test -B build-test

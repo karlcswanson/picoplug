@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Serve src/web/index.html and a canned /status.json for developing the viewer
+Serve the built viewer page (web/dist/index.html) and a canned /status.json for developing the viewer
 page without hardware.
 
     python3 web_mock.py [--port 8080] [--ndjson FILE] [--index N]
@@ -19,7 +19,7 @@ import time
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 WEB = os.path.join(HERE, "..", "src", "web")
-PAGE = os.path.join(WEB, "index.html")
+PAGE = os.path.join(HERE, "..", "web", "dist", "index.html")
 
 
 def main():
