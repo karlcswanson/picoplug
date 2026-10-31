@@ -19,7 +19,8 @@
   <ProtoCard key="lacp" icon="link" title="Port channel" state={fwd ? 'ok' : 'heard'} summary={fwd ? 'forwarding' : 'not forwarding'}>
     <Kv k="LACP" wide copy={String(a.key)}>
       <span class="say">{fwd ? 'LACP · forwarding' : 'LACP · not forwarding'}</span>
-      <Ln p={[a.active ? 'active' : 'passive', every, sg(a.key, 'key'), sg(a.port, 'port'), sg(a.system, 'switch'), l.changes ? 'changed ' + l.changes + '×' : '']}/>
+      <Ln p={[a.active ? 'active' : 'passive', every, sg(a.key, 'key'), sg(a.port, 'port'), sg(a.system, 'switch'),
+        l.changes ? 'changed ' + l.changes + '×' : '']}/>
       <Ln p={'last ' + fmtAgo(l.last_s)}/>
     </Kv>
   </ProtoCard>

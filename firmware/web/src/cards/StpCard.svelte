@@ -11,10 +11,13 @@
   let isroot = $derived(st && st.root && st.root.is_neighbor);
   let kind = $derived(st ? (st.proto || '').toUpperCase()
     + (st.pvst ? ' (PVST+' + (st.vlan ? ' VLAN ' + st.vlan : '') + ')' : st.vlan ? ' VLAN ' + st.vlan : '')
-    + (st.role ? ' · ' + st.role : '') + (st.state && st.state !== 'unknown' ? ' · ' + st.state : '')
+    + (st.role ? ' · ' + st.role : '') + (state ? ' · ' + state : '')
     + (st.tc ? ' · topology change' : '') : '');
-  let sum = $derived(st ? [(st.proto || '').toUpperCase(), st.role, st.state && st.state !== 'unknown' ? st.state : ''].filter(Boolean).join(' · ')
-    + (st.tc ? ' · topology change' : st.root_changes ? ' · root changed' : '') : '');
+  let state = $derived(st && st.state && st.state !== 'unknown' ? st.state : '');
+  let sum = $derived(!st ? '' : [(st.proto || '').toUpperCase(), st.role, state].filter(Boolean).join(' · ')
+    + (st.tc ? ' · topology change' : st.root_changes ? ' · root changed' : ''));
+  let instances = $derived(st && st.mst ? st.mst.instances + ' instance' + (st.mst.instances === 1 ? '' : 's') : '');
+  const secs = (v, label) => [sg(v, label), ' s'];
 </script>
 
 {#if !st || !st.seen}
@@ -29,16 +32,23 @@
       </Kv>
     {/if}
     {#if st.bridge && !isroot}
-      <Kv k="Bridge" wide><Parts sep="" p={[sg(st.bridge.priority), ' / ', sg(st.bridge.mac), st.port_number ? [' ', sg(st.port_number, 'port')] : '']}/></Kv>
+      <Kv k="Bridge" wide>
+        <Parts sep="" p={[sg(st.bridge.priority), ' / ', sg(st.bridge.mac), st.port_number ? [' ', sg(st.port_number, 'port')] : '']}/>
+      </Kv>
     {/if}
     {#if st.mst}
       <Kv k="MST region" wide>
-        <Parts p={[[sg(st.mst.region || '(none)'), ' ', sg(st.mst.revision, 'rev')], st.mst.instances + ' instance' + (st.mst.instances === 1 ? '' : 's'), st.mst.hops + ' hops left']}/>
-        {#if st.mst.regional_root && !st.mst.regional_root.is_neighbor}<Ln p={[sg(st.mst.regional_root.mac, 'regional root'), sg(st.mst.internal_cost, 'internal cost')]}/>{/if}
+        <Parts p={[[sg(st.mst.region || '(none)'), ' ', sg(st.mst.revision, 'rev')], instances, st.mst.hops + ' hops left']}/>
+        {#if st.mst.regional_root && !st.mst.regional_root.is_neighbor}
+          <Ln p={[sg(st.mst.regional_root.mac, 'regional root'), sg(st.mst.internal_cost, 'internal cost')]}/>
+        {/if}
       </Kv>
     {/if}
     {#if st.hello_s !== undefined}
-      <Kv k="Timers" wide><Parts p={[[sg(st.hello_s, 'hello'), ' s'], [sg(st.max_age_s, 'max age'), ' s'], [sg(st.fwd_delay_s, 'fwd delay'), ' s'], st.msg_age_s ? [sg(st.msg_age_s, 'age'), ' s'] : '']}/></Kv>
+      <Kv k="Timers" wide>
+        <Parts p={[secs(st.hello_s, 'hello'), secs(st.max_age_s, 'max age'), secs(st.fwd_delay_s, 'fwd delay'),
+          st.msg_age_s ? secs(st.msg_age_s, 'age') : '']}/>
+      </Kv>
     {/if}
     <Kv k="BPDUs heard" wide>
       <Parts sep="" p={[sg(st.count), st.interval_ms ? [' · every ', sg(Math.round(st.interval_ms / 100) / 10), ' s'] : '']}/>

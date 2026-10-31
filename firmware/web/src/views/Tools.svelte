@@ -6,7 +6,7 @@
   import { app, targets, pickTarget, tool } from '../lib/app.svelte.js';
   import { runs, fmtTime } from '../lib/history.svelte.js';
   import { say } from '../lib/copy.svelte.js';
-  import { fmtAgo } from '../lib/format.js';
+  import { fmtAgo, fmtMs } from '../lib/format.js';
 
   let s = $derived(conn.status);
   let t = $derived(s && s.tool);
@@ -48,8 +48,13 @@
     const off = n - rt.length, bars = [];
     rt.forEach((r, i) => {
       const x = PL + (off + i) * bw + 1, seq = fs + i, w = Math.max(1, bw - 2);
-      if (r === null) { if (!(t.running && i === rt.length - 1)) bars.push({ to: true, x, y: PT, w, h: H - PT - PB, tip: '#' + seq + ': no reply' }); }
-      else { const h = Math.max(1.5, y(0) - y(r)); bars.push({ x, y: y(0) - h, w, h, tip: '#' + seq + ': ' + (r === 0 ? '<1' : r) + ' ms' }); }
+      if (r === null) {
+        // the probe still in flight isn't a loss yet
+        if (!(t.running && i === rt.length - 1)) bars.push({ to: true, x, y: PT, w, h: H - PT - PB, tip: '#' + seq + ': no reply' });
+      } else {
+        const h = Math.max(1.5, y(0) - y(r));
+        bars.push({ x, y: y(0) - h, w, h, tip: '#' + seq + ': ' + fmtMs(r) });
+      }
     });
     return { W, H, PL, PT, top, y, bars, n };
   });
@@ -61,6 +66,11 @@
     hostEl.blur();
     tool(kind + '=' + encodeURIComponent(h) + (kind === 'ping' ? '&count=0' : ''));
   }
+  let blinkStatus = $derived(!blinking ? ''
+    : blink.pulse ? 'path test · link down'
+    : blink.remaining_s ? 'blinking · ' + blink.remaining_s + ' s left'
+    : 'waiting for link…');
+
   function again(x) { app.host = x.h; app.qt = ''; run(x.k); }
 </script>
 
@@ -75,19 +85,27 @@
     {/each}
   </div>
   <div class="row2" style="margin-top:8px">
-    <button class={running === 'ping' ? 'stop' : 'p'} disabled={running === 'trace'} onclick={() => run('ping')}><Icon name={running === 'ping' ? 'stop' : 'ping'}/><span>{running === 'ping' ? 'Stop' : 'Ping'}</span></button>
-    <button class={running === 'trace' ? 'stop' : ''} disabled={running === 'ping'} onclick={() => run('trace')}><Icon name={running === 'trace' ? 'stop' : 'trace'}/><span>{running === 'trace' ? 'Stop' : 'Trace'}</span></button>
+    <button class={running === 'ping' ? 'stop' : 'p'} disabled={running === 'trace'} onclick={() => run('ping')}>
+      <Icon name={running === 'ping' ? 'stop' : 'ping'}/><span>{running === 'ping' ? 'Stop' : 'Ping'}</span>
+    </button>
+    <button class={running === 'trace' ? 'stop' : ''} disabled={running === 'ping'} onclick={() => run('trace')}>
+      <Icon name={running === 'trace' ? 'stop' : 'trace'}/><span>{running === 'trace' ? 'Stop' : 'Trace'}</span>
+    </button>
   </div>
   {#if t && t.kind !== 'idle'}
     <div class="tout">
-      <div class="thd"><Icon name={t.kind}/><span>{t.kind} {t.host}{#if t.addr && t.addr !== t.host}{' '}<span class="c-mut">{t.addr}</span>{/if}</span>
+      <div class="thd">
+        <Icon name={t.kind}/>
+        <span>{t.kind} {t.host}{#if t.addr && t.addr !== t.host}{' '}<span class="c-mut">{t.addr}</span>{/if}</span>
         {#if t.running}<span class="live on"><i></i>{t.kind === 'ping' && t.count === 0 ? 'continuous' : 'running'}</span>
         {:else}<span class="live"><i></i>done{t.age_s >= 60 ? ', ' + fmtAgo(t.age_s) : ''}</span>{/if}
       </div>
       {#if ping}
         <svg class="tplot" viewBox="0 0 {plot.W} {plot.H}" role="img" aria-label="round-trip time, last {plot.n} pings">
           {#each [0, plot.top / 2, plot.top] as v}<line x1={plot.PL} y1={plot.y(v)} x2={plot.W} y2={plot.y(v)}/>{/each}
-          <text x="0" y={plot.PT + 9}>{plot.top}</text><text x="0" y={plot.y(plot.top / 2) + 4}>{plot.top / 2}</text><text x="0" y={plot.y(0) + 3}>ms</text>
+          <text x="0" y={plot.PT + 9}>{plot.top}</text>
+          <text x="0" y={plot.y(plot.top / 2) + 4}>{plot.top / 2}</text>
+          <text x="0" y={plot.y(0) + 3}>ms</text>
           {#each plot.bars as b}<rect class:to={b.to} x={b.x} y={b.y} width={b.w} height={b.h}><title>{b.tip}</title></rect>{/each}
         </svg>
         <div class="legend"><span><i></i>reply</span><span><i class="to"></i>no reply</span></div>
@@ -101,7 +119,19 @@
       {:else}
         <table class="trace"><tbody>
           {#each hops as h}
-            <tr><td>{h.ttl}</td><td>{#if h.addr}{h.addr}{:else if h.timeout}<span class="c-mut">* no reply</span>{:else}…{/if}{#if h.reached}{' '}<Icon name="ok" size="s c-ok"/>{/if}{h.unreachable ? ' unreachable' : ''}</td><td>{h.addr ? (h.ms === 0 ? '<1' : h.ms) + ' ms' : ''}</td></tr>
+            <tr>
+              <td>{h.ttl}</td>
+              <td>
+                {#if h.addr}
+                  {h.addr}
+                {:else if h.timeout}
+                  <span class="c-mut">* no reply</span>
+                {:else}
+                  …
+                {/if}{#if h.reached}{' '}<Icon name="ok" size="s c-ok"/>{/if}{h.unreachable ? ' unreachable' : ''}
+              </td>
+              <td>{h.addr ? fmtMs(h.ms) : ''}</td>
+            </tr>
           {/each}
         </tbody></table>
         {#if t.reached}<div class="tmsg c-ok">Reached in {hops.length} hop{hops.length === 1 ? '' : 's'}</div>
@@ -117,7 +147,8 @@
     <div class="runs">
       {#each runs.list as x}
         <div class="run"><Icon name={x.k}/><div class="lb"><b>{x.h}</b><small>{x.k} · {x.s || ''} · {fmtTime(x.t)}</small></div>
-          <button class="q" aria-label="Run {x.k} to {x.h} again" disabled={!!running} onclick={() => again(x)}><Icon name="redo"/></button></div>
+          <button class="q" aria-label="Run {x.k} to {x.h} again" disabled={!!running} onclick={() => again(x)}><Icon name="redo"/></button>
+        </div>
       {/each}
     </div>
   </div>
@@ -126,7 +157,9 @@
   <div class="chead"><span class="sec"><Icon name="flash" size="s"/>Find this port</span></div>
   <div class="ln" style="margin:0 0 10px">Blinks the switch port LED for 32 s</div>
   <div class="crow">
-    <button class={blinking ? 'stop' : ''} onclick={() => tool('blink=' + (blinking ? '0' : '1'))}><Icon name={blinking ? 'stop' : 'flash'}/><span>{blinking ? 'Stop blinking' : 'Blink port'}</span></button>
-    <span class="meta" style="text-align:left">{blinking && blink.pulse ? 'path test · link down' : blinking ? (blink.remaining_s ? 'blinking · ' + blink.remaining_s + ' s left' : 'waiting for link…') : ''}</span>
+    <button class={blinking ? 'stop' : ''} onclick={() => tool('blink=' + (blinking ? '0' : '1'))}>
+      <Icon name={blinking ? 'stop' : 'flash'}/><span>{blinking ? 'Stop blinking' : 'Blink port'}</span>
+    </button>
+    <span class="meta" style="text-align:left">{blinkStatus}</span>
   </div>
 </div>

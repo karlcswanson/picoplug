@@ -1,6 +1,9 @@
 <script module>
   // kept across tab switches
-  const f = $state({ probe: '', probeSaved: '', lldp: false, cdp: false, ping: '', name: '', dns: '', usb: '', defaults: {}, reboot: false, usbSaved: '' });
+  const f = $state({
+    probe: '', probeSaved: '', lldp: false, cdp: false,
+    ping: '', name: '', dns: '', usb: '', defaults: {}, reboot: false, usbSaved: '',
+  });
   const m = $state({ msg: '', fmsg: '' });
 </script>
 
@@ -17,6 +20,7 @@
   let tx = $derived((s && s.tx) || {});
   let formText = $state(app.form), formEl;
   let theme = $state((() => { try { return localStorage.getItem('picolldp.theme') || 'auto'; } catch (e) { return 'auto'; } })());
+  let cdpNote = $derived(tx.cdp ? tx.cdp.frames + ' sent' + (tx.cdp.enabled && !tx.cdp.peer ? ' · no CDP switch' : '') : '');
   let preview = $derived(formText.trim() ? formFill(formText.trim(), formVals(s, current())) : 'no button');
 
   function fill(j) {
@@ -68,7 +72,7 @@
 <div class="card">
   <div class="chead"><span class="sec"><Icon name="cast" size="s"/>Advertise</span></div>
   <label class="cb"><input type="checkbox" bind:checked={f.lldp} onchange={adv}> LLDP <span class="meta">{tx.lldp ? tx.lldp.frames + ' sent' : ''}</span></label>
-  <label class="cb"><input type="checkbox" bind:checked={f.cdp} onchange={adv}> CDP (Cisco) <span class="meta">{tx.cdp ? tx.cdp.frames + ' sent' + (tx.cdp.enabled && !tx.cdp.peer ? ' · no CDP switch' : '') : ''}</span></label>
+  <label class="cb"><input type="checkbox" bind:checked={f.cdp} onchange={adv}> CDP (Cisco) <span class="meta">{cdpNote}</span></label>
 </div>
 <div class="card">
   <div class="chead"><span class="sec"><Icon name="sun" size="s"/>Appearance</span></div>
@@ -93,17 +97,29 @@
   <div class="chead"><span class="sec"><Icon name="reach" size="s"/>Port checks and USB</span></div>
   <!-- svelte-ignore a11y_no_static_element_interactions -->
   <div onkeydown={e => enter(e, save)}>
-    <label class="fl" for="s_ping">Ping target</label><input class="in" id="s_ping" inputmode="decimal" autocomplete="off" placeholder={f.defaults.ping_target || ''} bind:value={f.ping}>
-    <label class="fl" for="s_name">DNS name</label><input class="in" id="s_name" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" placeholder={f.defaults.dns_name || ''} bind:value={f.name}>
-    <label class="fl" for="s_dns">DNS server · blank = DHCP</label><input class="in" id="s_dns" inputmode="decimal" autocomplete="off" bind:value={f.dns}>
-    <label class="fl" for="s_usb">USB address</label><input class="in" id="s_usb" inputmode="decimal" autocomplete="off" placeholder={f.defaults.usb_ip || ''} bind:value={f.usb}>
+    <label class="fl" for="s_ping">Ping target</label>
+    <input class="in" id="s_ping" inputmode="decimal" autocomplete="off" placeholder={f.defaults.ping_target || ''} bind:value={f.ping}>
+    <label class="fl" for="s_name">DNS name</label>
+    <input class="in" id="s_name" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false"
+      placeholder={f.defaults.dns_name || ''} bind:value={f.name}>
+    <label class="fl" for="s_dns">DNS server · blank = DHCP</label>
+    <input class="in" id="s_dns" inputmode="decimal" autocomplete="off" bind:value={f.dns}>
+    <label class="fl" for="s_usb">USB address</label>
+    <input class="in" id="s_usb" inputmode="decimal" autocomplete="off" placeholder={f.defaults.usb_ip || ''} bind:value={f.usb}>
     {#if f.reboot}
       <div class="note" style="margin-top:12px;display:block">
         {#if app.rebooting}<b>Rebooting</b> · <span class="mono">http://{app.rebooting}/</span> in ~10 s
-        {:else}<b>Applies after reboot</b> · <span class="mono">http://{f.usbSaved}/</span> <div style="margin-top:8px"><button onclick={reboot}>Reboot now</button></div>{/if}
+        {:else}
+          <b>Applies after reboot</b> · <span class="mono">http://{f.usbSaved}/</span>
+          <div style="margin-top:8px"><button onclick={reboot}>Reboot now</button></div>
+        {/if}
       </div>
     {/if}
-    <div class="crow" style="margin-top:12px"><button class="p" onclick={save}>Save</button><button class="q" onclick={() => send('reset=1')}>Defaults</button><span class="meta">{m.msg}</span></div>
+    <div class="crow" style="margin-top:12px">
+      <button class="p" onclick={save}>Save</button>
+      <button class="q" onclick={() => send('reset=1')}>Defaults</button>
+      <span class="meta">{m.msg}</span>
+    </div>
   </div>
 </div>
 <div class="card">
@@ -112,7 +128,13 @@
   <label class="fl" for="s_form">Link</label>
   <input class="in" id="s_form" inputmode="url" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false"
     bind:this={formEl} bind:value={formText} onkeydown={e => enter(e, formSave)}>
-  <div class="ln" style="margin-top:8px">Fill-ins: <span class="mono">{'{switch} {switch_ip} {port} {port_desc} {vlan} {voice_vlan} {ip} {gateway} {probe}'}</span></div>
+  <div class="ln" style="margin-top:8px">
+    Fill-ins: <span class="mono">{'{switch} {switch_ip} {port} {port_desc} {vlan} {voice_vlan} {ip} {gateway} {probe}'}</span>
+  </div>
   <div class="ln" style="margin-top:8px">Now: <span class="mono" style="word-break:break-all">{preview}</span></div>
-  <div class="crow" style="margin-top:12px"><button class="p" onclick={formSave}>Save</button><button class="q" onclick={() => { formText = app.formDef; m.fmsg = 'Not saved yet'; }}>Default</button><span class="meta">{m.fmsg}</span></div>
+  <div class="crow" style="margin-top:12px">
+    <button class="p" onclick={formSave}>Save</button>
+    <button class="q" onclick={() => { formText = app.formDef; m.fmsg = 'Not saved yet'; }}>Default</button>
+    <span class="meta">{m.fmsg}</span>
+  </div>
 </div>

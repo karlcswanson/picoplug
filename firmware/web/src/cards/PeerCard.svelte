@@ -20,7 +20,8 @@
 
   function where(p) {
     if (p.sees_us) return 'neighbor: this probe';
-    if (p.chassis && myCh && stripKind(p.chassis) === myCh) return ['same switch' + (cur.sys_name ? ' (' + cur.sys_name + ')' : '') + ', port ', sg(p.port)];
+    if (p.chassis && myCh && stripKind(p.chassis) === myCh)
+      return ['same switch' + (cur.sys_name ? ' (' + cur.sys_name + ')' : '') + ', port ', sg(p.port)];
     if (p.chassis) return ['on ', sg(stripKind(p.chassis)), p.port ? [' port ', sg(p.port)] : ''];
     return '';
   }
@@ -39,6 +40,10 @@
   let vs = $derived(!phase || phase === 'idle' ? '' : busy ? ' · testing path' : pt.verdict === 'direct' ? ' · link dropped'
     : pt.verdict && pt.verdict.startsWith('switched') ? ' · link stayed up' : '');
 
+  let count = $derived(list.length + ' probe' + (list.length === 1 ? '' : 's') + vs);
+  let others = $derived(!ps || ps.other_macs === undefined ? '' : ps.other_macs === 0 ? 'none heard'
+    : ps.other_macs + (ps.other_macs_capped ? '+' : '') + ' other source MAC' + (ps.other_macs === 1 ? '' : 's') + ' heard');
+
   function testPath(e, mac) {
     e.stopPropagation(); e.currentTarget.blur();
     tool('path=1&peer=' + encodeURIComponent(mac));
@@ -48,20 +53,24 @@
 {#if !list.length && (!phase || phase === 'idle')}
   <ProtoCard key="peer" icon="probes" title="Other probes" state={w ? 'listen' : 'none'} summary={w || 'none heard'}/>
 {:else}
-  <ProtoCard key="peer" icon="probes" title="Other probes" state={list.length ? 'ok' : 'heard'} summary={list.length + ' probe' + (list.length === 1 ? '' : 's') + vs}>
+  <ProtoCard key="peer" icon="probes" title="Other probes" state={list.length ? 'ok' : 'heard'} summary={count}>
     {#each list as p}
       <Kv k={isP(p.probe) ? 'Probe ' + p.probe + ' · ' + RES[p.probe] : 'Probe'} wide copy={p.mac}>
         <ProbeBadge n={p.probe}/><Parts p={sg(p.mac)}/>
         <Ln p={[where(p), p.pvid !== undefined ? 'PVID ' + p.pvid : '', p.speed ? p.speed + 'M ' + (p.full_duplex ? 'FD' : 'HD') : '',
           p.rtt_ms !== undefined ? (p.rtt_min_ms === 0 ? '<1' : p.rtt_min_ms) + ' ms' : '', 'heard ' + fmtAgo(p.age_s)]}/>
-        {#if !busy}<div style="margin-top:8px"><button class="q" onclick={e => testPath(e, p.mac)}><Icon name="probes"/>Test path</button></div>{/if}
+        {#if !busy}
+          <div style="margin-top:8px"><button class="q" onclick={e => testPath(e, p.mac)}><Icon name="probes"/>Test path</button></div>
+        {/if}
       </Kv>
     {/each}
     {#if ps && ps.other_macs !== undefined}
-      <Kv k="Other devices" wide><span class="say">{ps.other_macs === 0 ? 'none heard' : ps.other_macs + (ps.other_macs_capped ? '+' : '') + ' other source MAC' + (ps.other_macs === 1 ? '' : 's') + ' heard'}</span></Kv>
+      <Kv k="Other devices" wide><span class="say">{others}</span></Kv>
     {/if}
     {#if verdict || (phase && phase !== 'idle')}
-      <Kv k="Path test" wide><span class="say">{verdict}</span>{#if phase === 'recovering'}<Ln p={'waiting ' + sec(pt.elapsed_ms) + '…'}/>{/if}</Kv>
+      <Kv k="Path test" wide>
+        <span class="say">{verdict}</span>{#if phase === 'recovering'}<Ln p={'waiting ' + sec(pt.elapsed_ms) + '…'}/>{/if}
+      </Kv>
     {/if}
   </ProtoCard>
 {/if}

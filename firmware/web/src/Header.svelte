@@ -20,6 +20,7 @@
     !dhcp.bound && up >= 30 && !dhcp.offers ? ' · no DHCP reply' : '',
     isStale(cur) ? ' · stale' : '',
   ]);
+  let speed = $derived(s && s.eth.link ? s.eth.speed + 'M ' + (s.eth.duplex === 'full' ? 'FD' : 'HD') : 'no link');
   let ago = $state(0);
   $effect(() => {
     if (!offline) return;
@@ -45,7 +46,9 @@
       </a>
     </div>
     <div class="chips">
-      <span class="chip" class:on={s && s.eth.link && !lost} class:off={!s || !s.eth.link || lost}><Icon name="port" size="s"/><span>{s && s.eth.link ? `${s.eth.speed}M ${s.eth.duplex === 'full' ? 'FD' : 'HD'}` : 'no link'}</span><i class="dot"></i></span>
+      <span class="chip" class:on={s && s.eth.link && !lost} class:off={!s || !s.eth.link || lost}>
+        <Icon name="port" size="s"/><span>{speed}</span><i class="dot"></i>
+      </span>
       <span class="chip" class:on={s && !lost} class:off={lost}><Icon name="usb" size="s"/>USB<i class="dot"></i></span>
     </div>
   </div>
@@ -55,6 +58,9 @@
     {/each}
   </nav>
   {#if offline}
-    <div class="conn" role="status"><span class="spin"></span><span>Reconnecting <small>· last reply {fmtDur(ago)} ago{fails >= 3 ? ' · check USB' : ''}</small></span></div>
+    <div class="conn" role="status">
+      <span class="spin"></span>
+      <span>Reconnecting <small>· last reply {fmtDur(ago)} ago{fails >= 3 ? ' · check USB' : ''}</small></span>
+    </div>
   {/if}
 </header>

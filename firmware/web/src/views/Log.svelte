@@ -12,7 +12,11 @@
   // focus the copy box once per failed copy, not on every visit to Log
   $effect(() => { if (app.fbFocus && fb) { fb.focus(); fb.select(); app.fbFocus = false; } });
 
-  const when = e => `first ${fmtTime(e.first)}${e.last - e.first > 60000 ? ' · last ' + fmtTime(e.last) : ''}${e.sessions > 1 ? ' · ' + e.sessions + ' visits' : ''}${e.dhcp ? ' · DHCP ' + e.dhcp : ''}`;
+  const visits = e => e.sessions > 1 ? ' · ' + e.sessions + ' visits' : '';
+  const when = e => 'first ' + fmtTime(e.first) + (e.last - e.first > 60000 ? ' · last ' + fmtTime(e.last) : '')
+    + visits(e) + (e.dhcp ? ' · DHCP ' + e.dhcp : '');
+  const span = e => fmtTime(e.first) + (e.last - e.first > 60000 ? ' to ' + fmtTime(e.last) : '') + visits(e);
+  const vlans = e => (e.pvid !== undefined ? ' · VLAN ' + e.pvid : '') + (e.voice ? ' · voice ' + e.voice : '');
 
   function rowClick(e, k) {
     if (e.target.closest('input,.hdet,.copy,.sg,button')) return;
@@ -35,7 +39,10 @@
 <div class="card" id="hcard">
   <div class="chead">
     <span class="sec"><Icon name="log" size="s"/>Ports visited <span class="meta">{hist.list.length || ''}</span></span>
-    <span class="crow"><button class="q" onclick={csv}><Icon name="download"/>CSV</button><button class="q" onclick={clear}><Icon name="trash"/>Clear</button></span>
+    <span class="crow">
+      <button class="q" onclick={csv}><Icon name="download"/>CSV</button>
+      <button class="q" onclick={clear}><Icon name="trash"/>Clear</button>
+    </span>
   </div>
   <div class="hist">
     {#each hist.list as e}
@@ -43,9 +50,11 @@
       <!-- svelte-ignore a11y_click_events_have_key_events, a11y_no_static_element_interactions -->
       <div class="hrow" class:open onclick={ev => rowClick(ev, e.key)}>
         <div>
-          <span class="p">{e.port}</span> <span>on {e.sys_name || e.chassis}{e.pvid !== undefined ? ' · VLAN ' + e.pvid : ''}{e.voice ? ' · voice ' + e.voice : ''}</span>
-          <div class="t">{fmtTime(e.first)}{e.last - e.first > 60000 ? ' to ' + fmtTime(e.last) : ''}{e.sessions > 1 ? ' · ' + e.sessions + ' visits' : ''}</div>
-          {#if open}<input placeholder="note (room, jack, ticket…)" aria-label="Note" value={e.note || ''} onchange={ev => setNote(e.key, ev.target.value)}>
+          <span class="p">{e.port}</span> <span>on {e.sys_name || e.chassis}{vlans(e)}</span>
+          <div class="t">{span(e)}</div>
+          {#if open}
+            <input placeholder="note (room, jack, ticket…)" aria-label="Note" value={e.note || ''}
+              onchange={ev => setNote(e.key, ev.target.value)}>
           {:else if e.note}<div class="t">{e.note}</div>{/if}
         </div>
         <button class="x" aria-label="Remove {e.port}" onclick={() => hDel(e.key)}><Icon name="x"/></button>
@@ -54,7 +63,11 @@
             {#if e.raw}<NeighborCard n={e.raw} detail foot={when(e)}/>
             {:else}
               <div class="card nb">
-                <div class="nrow"><Icon name="switch" size="l"/><div class="name">{e.sys_name || e.chassis}</div><span class="ptag">{e.proto.toUpperCase()}</span></div>
+                <div class="nrow">
+                  <Icon name="switch" size="l"/>
+                  <div class="name">{e.sys_name || e.chassis}</div>
+                  <span class="ptag">{e.proto.toUpperCase()}</span>
+                </div>
                 <div class="port copy" style:font-size={portFit(e.port)} use:copyable={e.port}>{e.port}</div>
                 <div class="desc">{e.port_desc}</div>
                 <div class="grid">

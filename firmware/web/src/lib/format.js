@@ -38,7 +38,9 @@ export function summary(n) {
   if (n.pvid !== undefined) L.push('PVID: ' + n.pvid);
   if (n.vlans) L.push('VLANs: ' + n.vlans.map(v => v.id + ' ' + v.name).join(', '));
   if (n.voice_vlan) L.push('Voice VLAN: ' + n.voice_vlan.id + (n.voice_vlan.tagged ? ' tagged' : '') + ' dscp ' + n.voice_vlan.dscp);
-  if (n.poe) L.push('PoE: ' + (n.poe.class !== undefined ? 'class ' + n.poe.class : '') + (n.poe.alloc_w !== undefined ? ', ' + n.poe.alloc_w + ' W allocated' : '') + (n.poe.req_w !== undefined ? ', ' + n.poe.req_w + ' W requested' : ''));
+  if (n.poe) L.push('PoE: ' + (n.poe.class !== undefined ? 'class ' + n.poe.class : '')
+    + (n.poe.alloc_w !== undefined ? ', ' + n.poe.alloc_w + ' W allocated' : '')
+    + (n.poe.req_w !== undefined ? ', ' + n.poe.req_w + ' W requested' : ''));
   if (n.mgmt_vid !== undefined) L.push('Mgmt VLAN: ' + n.mgmt_vid);
   if (n.location) L.push('Location: ' + n.location.text);
   if (n.caps) L.push('Caps: ' + n.caps.join(', '));

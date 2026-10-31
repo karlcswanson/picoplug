@@ -6,7 +6,13 @@ import { sel } from './ui.svelte.js';
 import { say } from './copy.svelte.js';
 
 export const VIEWS = ['port', 'tools', 'log', 'setup'];
-export const app = $state({ view: 'port', readonly: false, form: '', formDef: '', host: '', qt: '', fallback: '', fbFocus: false, rebooting: '' });
+export const app = $state({
+  view: 'port', readonly: false,
+  form: '', formDef: '',       // the Form link template and its default
+  host: '', qt: '',            // the Tools target and which quick button picked it
+  fallback: '', fbFocus: false, // text to copy by hand when the clipboard refuses
+  rebooting: '',               // the address the device comes back on after a reboot
+});
 
 // tabs: hash routing, no reload; a fresh load always lands on Port
 export function route() {
@@ -24,8 +30,12 @@ export function current() { const s = conn.status; return s ? pickCurrent(s.neig
 export function targets() {
   const s = conn.status || {}, d = (s.port && s.port.dhcp) || {}, pr = (s.port && s.port.probe) || {};
   const cur = current() || {};
-  return { gw: d.gateway || '', inet: (pr.internet && pr.internet.target) || '', dns: (d.dns && d.dns[0]) || (pr.dns && pr.dns.server) || '',
-    sw: ((cur.mgmt_addr || []).find(a => !a.includes(':'))) || '' };
+  return {
+    gw: d.gateway || '',
+    inet: (pr.internet && pr.internet.target) || '',
+    dns: (d.dns && d.dns[0]) || (pr.dns && pr.dns.server) || '',
+    sw: (cur.mgmt_addr || []).find(a => !a.includes(':')) || '',
+  };
 }
 export function pickTarget(k) { const t = targets()[k]; app.qt = k; if (t) app.host = t; }
 
@@ -41,7 +51,12 @@ export const formFill = (t, v) => t.replace(/\{(\w+)\}/g, (m, k) => k in v ? enc
 
 // GET /tool?... and toast the error, if any
 export function tool(q, okMsg) {
-  return fetch('/tool?' + q).then(r => r.json()).then(j => { if (j.ok) { if (okMsg) say(okMsg); } else say(j.error || 'Rejected'); return j; })
+  return fetch('/tool?' + q).then(r => r.json())
+    .then(j => {
+      if (!j.ok) say(j.error || 'Rejected');
+      else if (okMsg) say(okMsg);
+      return j;
+    })
     .catch(() => { say('No reply'); });
 }
 

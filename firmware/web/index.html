@@ -12,7 +12,13 @@
 <link rel="icon" type="image/png" href="/icon.png">
 <link rel="manifest" href="/manifest.json">
 <title>picoplug</title>
-<script>try{var t=localStorage.getItem('picolldp.theme');if(t==='light'||t==='dark')document.documentElement.setAttribute('data-theme',t);}catch(e){}</script>
+<script>
+  // apply the saved theme before the first paint, so a dark choice never flashes light
+  try {
+    var t = localStorage.getItem('picolldp.theme');
+    if (t === 'light' || t === 'dark') document.documentElement.setAttribute('data-theme', t);
+  } catch (e) {}
+</script>
 </head>
 <body>
 <script type="module" src="/src/main.js"></script>

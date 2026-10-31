@@ -77,7 +77,10 @@
     <section>
     {#if s}
       {#if s.eth.chip_ok === false}
-        <div class="alert"><div class="t"><Icon name="fail"/>Ethernet chip not responding</div><p>VERSIONR {s.eth.version} · {s.eth.init_attempts} tries · replug</p></div>
+        <div class="alert">
+          <div class="t"><Icon name="fail"/>Ethernet chip not responding</div>
+          <p>VERSIONR {s.eth.version} · {s.eth.init_attempts} tries · replug</p>
+        </div>
       {:else if !s.eth.link}
         <NoLink/><LastPort/>
       {/if}
@@ -97,7 +100,9 @@
       {/if}
     {/if}
       {#if app.readonly}
-        <div class="card"><div class="nrow" style="color:var(--mut);font-size:14px"><Icon name="lock"/><span>Read-only · port side</span></div></div>
+        <div class="card">
+          <div class="nrow" style="color:var(--mut);font-size:14px"><Icon name="lock"/><span>Read-only · port side</span></div>
+        </div>
       {/if}
     </section>
   {:else if app.view === 'tools'}

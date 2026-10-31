@@ -44,9 +44,12 @@ export function historyUpsert(s) {
 
 export function histCsv() {
   const q = v => '"' + String(v ?? '').replace(/"/g, '""') + '"';
-  const rows = [['first_seen', 'last_seen', 'visits', 'switch', 'port', 'port_desc', 'chassis', 'proto', 'pvid', 'voice_vlan', 'vlans', 'mgmt', 'platform', 'poe_alloc_w', 'dhcp', 'note']];
-  for (const e of load(HKEY)) rows.push([new Date(e.first).toISOString(), new Date(e.last).toISOString(), e.sessions, e.sys_name, e.port, e.port_desc,
-    e.chassis, e.proto, e.pvid, e.voice, e.vlans, e.mgmt, e.platform, e.poe, e.dhcp, e.note]);
+  const rows = [['first_seen', 'last_seen', 'visits', 'switch', 'port', 'port_desc', 'chassis', 'proto',
+    'pvid', 'voice_vlan', 'vlans', 'mgmt', 'platform', 'poe_alloc_w', 'dhcp', 'note']];
+  for (const e of load(HKEY)) {
+    rows.push([new Date(e.first).toISOString(), new Date(e.last).toISOString(), e.sessions, e.sys_name, e.port, e.port_desc, e.chassis, e.proto,
+      e.pvid, e.voice, e.vlans, e.mgmt, e.platform, e.poe, e.dhcp, e.note]);
+  }
   return rows.map(r => r.map(q).join(',')).join('\n');
 }
 
@@ -69,5 +72,6 @@ export function toolSum(t) {
 
 export function fmtTime(t) {
   const d = new Date(t);
-  return d.toLocaleDateString(undefined, { month: 'short', day: 'numeric' }) + ' ' + d.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' });
+  return d.toLocaleDateString(undefined, { month: 'short', day: 'numeric' }) + ' '
+    + d.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' });
 }
