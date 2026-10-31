@@ -1,0 +1,100 @@
+# Build and test the firmware on every push.
+#   main      -> GitHub release with the .uf2 (v<FW_VERSION> on a version bump,
+#                otherwise a prerelease v<FW_VERSION>-g<sha>)
+#   branches  -> the .uf2 as a workflow artifact
+name: firmware
+
+on:
+  push:
+    branches: ['**']
+  workflow_dispatch:
+
+concurrency:
+  group: firmware-${{ github.ref }}
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
+
+env:
+  ARM_TOOLCHAIN: 14.3.rel1
+  BOARD: wiznet_w55rp20_evb_pico
+
+jobs:
+  build:
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Submodules
+        run: |
+          git submodule update --init firmware/lib/pico-sdk firmware/lib/ioLibrary_Driver
+          git -C firmware/lib/pico-sdk submodule update --init lib/tinyusb lib/lwip
+
+      - name: Cache Arm toolchain
+        id: toolchain
+        uses: actions/cache@v4
+        with:
+          path: ~/arm-gnu-toolchain
+          key: arm-gnu-toolchain-${{ env.ARM_TOOLCHAIN }}-x86_64
+
+      - name: Install Arm toolchain
+        if: steps.toolchain.outputs.cache-hit != 'true'
+        run: |
+          mkdir -p ~/arm-gnu-toolchain
+          curl -sSL "https://developer.arm.com/-/media/Files/downloads/gnu/$ARM_TOOLCHAIN/binrel/arm-gnu-toolchain-$ARM_TOOLCHAIN-x86_64-arm-none-eabi.tar.xz" \
+            | tar -xJ --strip-components=1 -C ~/arm-gnu-toolchain
+
+      - name: Cache picotool
+        uses: actions/cache@v4
+        with:
+          path: firmware/lib/.picotool
+          key: picotool-${{ hashFiles('.gitmodules') }}-${{ runner.os }}-sdk-2.3.1
+
+      - name: Host tests
+        run: |
+          cmake -S firmware/test -B build-test
+          cmake --build build-test -j
+          ctest --test-dir build-test --output-on-failure
+
+      - name: Build firmware
+        run: |
+          cmake -S firmware -B build -DPICO_BOARD=$BOARD -DPICO_TOOLCHAIN_PATH=$HOME/arm-gnu-toolchain
+          cmake --build build -j
+
+      - name: Name the build
+        id: ver
+        run: |
+          v=$(sed -n 's/^#define FW_VERSION *"\(.*\)"/\1/p' firmware/src/board_config.h)
+          sha=$(git rev-parse --short HEAD)
+          if git rev-parse -q --verify "refs/tags/v$v" >/dev/null; then
+            tag="v$v-g$sha"; pre=true
+          else
+            tag="v$v"; pre=false
+          fi
+          name="picoplug-$v-g$sha-w55rp20"
+          mkdir -p out
+          cp build/picolldp.uf2 "out/$name.uf2"
+          (cd out && sha256sum "$name.uf2" > "$name.uf2.sha256")
+          echo "version=$v" >> "$GITHUB_OUTPUT"
+          echo "tag=$tag" >> "$GITHUB_OUTPUT"
+          echo "pre=$pre" >> "$GITHUB_OUTPUT"
+          echo "name=$name" >> "$GITHUB_OUTPUT"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ${{ steps.ver.outputs.name }}
+          path: out/*
+
+      - name: Release
+        if: github.ref == 'refs/heads/main'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ steps.ver.outputs.tag }}
+          PRE: ${{ steps.ver.outputs.pre }}
+          VER: ${{ steps.ver.outputs.version }}
+        run: |
+          flags="--generate-notes"
+          if [ "$PRE" = true ]; then flags="$flags --prerelease"; fi
+          gh release create "$TAG" out/* --target "$GITHUB_SHA" --title "picoplug $TAG" $flags
