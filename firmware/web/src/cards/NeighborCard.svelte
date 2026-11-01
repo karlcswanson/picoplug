@@ -102,7 +102,7 @@
         <div class="grp"><Icon name="tag" size="s"/>VLANs</div>
         <div class="kv wide"><div class="tags">{#each n.vlans as v}<span class="tag"><b>{v.id}</b> {v.name}</span>{/each}</div></div>
       {/if}
-      {#if hasDev}<div class="grp"><Icon name="port" size="s"/>Port and device</div>{/if}
+      {#if hasDev}<div class="grp"><Icon name="cable" size="s"/>Port and device</div>{/if}
       {#if speed}<Kv k="Link">{speed}</Kv>{/if}
       {#if inv.serial}<Kv k="Serial" copy={inv.serial}>{inv.serial}</Kv>{/if}
       {#if poe || cpow}<Kv k="PoE">{@render nws(poe || cpow)}</Kv>{/if}

@@ -51,7 +51,7 @@
 
 <div class="card">
   <div class="chead">
-    <span class="sec"><Icon name="port" size="s"/>Network</span>
+    <span class="sec"><Icon name="network" size="s"/>Network</span>
     {#if pr.age_s !== undefined}<span class="meta">checked {fmtAgo(pr.age_s)}</span>{/if}
   </div>
   <div class="grid" style="margin-top:0">

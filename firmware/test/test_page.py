@@ -292,19 +292,19 @@ def main():
         load(0)
         check(cdp.js("!!document.querySelector('#pc-mcast.empty') && !!document.querySelector('#pc-ptp.empty')"), "no IGMP/PTP rows on an ordinary port")
         check(cdp.js("document.querySelector('#pc-mcast .sec').textContent") == "IGMP", "multicast card is titled IGMP when no PIM router is heard")
-        check(cdp.js("!!document.querySelector('#pc-lacp.empty .psum use[href=\\'#i-fail\\']')") and cdp.js("document.querySelector('#pc-lacp .sr').textContent") == "not in one", "port-channel card folded to an X on an ordinary port, words kept for screen readers")
+        check(cdp.js("!!document.querySelector('#pc-lacp.empty .psum use[href=\\'#i-fail\\']')") and cdp.js("document.querySelector('#pc-lacp .sr').textContent") == "not in one", "LAG card folded to an X on an ordinary port, words kept for screen readers")
         check(cdp.js("!!document.querySelector('#pc-peer.empty')"), "probes card folded without peers")
         check(cdp.js("!!document.querySelector('#pc-stp:not(.empty) .grid')"), "spanning-tree card open when BPDUs are heard")
         cdp.js("document.querySelector('#pc-stp .phead').click()"); time.sleep(0.3)
         check(cdp.js("!document.querySelector('#pc-stp .grid')"), "a card with data folds on tap")
         cdp.js("document.querySelector('#pc-stp .phead').click()"); time.sleep(0.3)
 
-        # --- case 6: an LACP port-channel member the switch holds out of the bundle
+        # --- case 6: an LACP LAG member the switch holds out of the bundle
         load(6)
         text = cdp.js("document.body.innerText")
-        check("not forwarding" in text and "every 1 s" in text and "key 2" in text and "port 7" in text, "port-channel row with LACP details")
-        check("LACP port channel" not in text and "Use a port outside" not in text and cdp.js("!!document.querySelector('#pc-dot1x.empty')"), "no DHCP hint or advice about the port channel")
-        check(tap('LACP') == '2', 'port-channel card copies the LACP key')
+        check("not forwarding" in text and "every 1 s" in text and "key 2" in text and "port 7" in text, "LAG row with LACP details")
+        check("LACP port channel" not in text and "Use a port outside" not in text and cdp.js("!!document.querySelector('#pc-dot1x.empty')"), "no DHCP hint or advice about the LAG")
+        check(tap('LACP') == '2', 'LAG card copies the LACP key')
 
         # --- case 7: another probe on the same switch, path test says switched, PVIDs differ
         load(7)

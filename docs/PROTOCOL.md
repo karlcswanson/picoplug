@@ -163,12 +163,12 @@ periodic port probe keeps running alongside.
 
 LACPDUs (IEEE 802.1AX, slow protocols EtherType 0x8809 subtype 1, to
 01:80:c2:00:00:02) the port has sent since link-up. A switch only sends
-them on a member of an LACP port channel. The tester never answers, so the
-switch sees no partner: most switches then hold the port out of the bundle
-and pass only link-local frames (LLDP, LACP), which shows up as DHCP
-getting no offer. Some run it as an individual port instead. The actor's
-collecting and distributing bits say which. Always present; only `seen`
-when nothing has arrived.
+them on a member of an LACP link aggregation group (LAG). The tester
+never answers, so the switch sees no partner: most switches then hold the
+port out of the bundle and pass only link-local frames (LLDP, LACP), which
+shows up as DHCP getting no offer. Some run it as an individual port
+instead. The actor's collecting and distributing bits say which. Always
+present; only `seen` when nothing has arrived.
 
 | Field | Type | Notes |
 |-------|------|-------|
@@ -177,12 +177,11 @@ when nothing has arrived.
 | `interval_ms` | int | Time between the last two. The switch transmits at the rate its *partner* asked for, so this, not `actor.fast`, is the real rate (1 s or 30 s). |
 | `changes` | int | Present when actor or partner info changed after the first PDU. |
 | `src_mac`, `version` | string, int | Sender MAC and LACP version. |
-| `actor` | object | The switch port: `system_priority`, `system` (MAC), `key` (the port channel's operational key), `port_priority`, `port`, `state` (raw byte) and the decoded bits `active`, `fast`, `aggregatable`, `sync`, `collecting`, `distributing`, `defaulted`, `expired`. |
+| `actor` | object | The switch port: `system_priority`, `system` (MAC), `key` (the LAG's operational key), `port_priority`, `port`, `state` (raw byte) and the decoded bits `active`, `fast`, `aggregatable`, `sync`, `collecting`, `distributing`, `defaulted`, `expired`. |
 | `partner` | object | Same shape: what the switch believes about the tester. With no LACP from our side the system MAC is all zeros and `defaulted` is set on the actor. |
 
-The page shows a "Port channel" row: "held out of the bundle" unless
-`actor.collecting` and `actor.distributing` are both set, and the DHCP
-row then blames the port channel instead of a missing server.
+The page shows a "LAG" card: "forwarding" when `actor.collecting` and
+`actor.distributing` are both set, "not forwarding" otherwise.
 
 ## Dot1x object
 
