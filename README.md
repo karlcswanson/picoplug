@@ -14,7 +14,7 @@ What the page answers:
   gateway / internet / DNS checks, spanning-tree role, state and root
   bridge from the port's BPDUs, passive 802.1X detection.
 * **Is the AV network behind it healthy?** IGMP querier (version, who it
-  is), PIM multicast router, PTP v1 (Dante) and PTP v2 (AES67 / SMPTE 2059)
+  is), PIM multicast router, PTP v1 and v2 (domain, transport)
   masters and grandmaster, shown in their own card when the port carries
   any of it.
 * **Tools:** ping with a live RTT plot, traceroute, and a port blinker
