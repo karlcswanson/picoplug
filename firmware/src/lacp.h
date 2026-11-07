@@ -1,12 +1,13 @@
 /*
  * lacp.h - passive LACP (IEEE 802.1AX) detection.
  *
- * A switch port that is a member of an LACP port channel sends LACPDUs
- * (slow protocols, EtherType 0x8809 subtype 1, to 01:80:c2:00:00:02) every
- * second (fast) or every 30 s (slow). We never answer, so the switch sees
- * no partner: most switches then keep the port out of the bundle and pass
- * only link-local frames (LLDP, LACP itself), some run it as an individual
- * port. The actor state bits the switch sends say which. Listen only.
+ * A switch port that is a member of an LACP link aggregation group (LAG)
+ * sends LACPDUs (slow protocols, EtherType 0x8809 subtype 1, to
+ * 01:80:c2:00:00:02) every second (fast) or every 30 s (slow). We never
+ * answer, so the switch sees no partner: most switches then keep the port
+ * out of the bundle and pass only link-local frames (LLDP, LACP itself),
+ * some run it as an individual port. The actor state bits the switch sends
+ * say which. Listen only.
  */
 #ifndef LACP_H
 #define LACP_H

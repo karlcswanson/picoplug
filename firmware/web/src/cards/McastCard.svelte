@@ -44,7 +44,7 @@
 {/snippet}
 
 {#if ig.seen}
-  <ProtoCard key="mcast" icon="wave" {title} state="ok" summary={querierSum}>
+  <ProtoCard key="mcast" icon="mcast" {title} state="ok" summary={querierSum}>
     <Kv k="IGMP querier" wide copy={noip ? ig.querier_mac : ig.querier}>
       <Parts sep="" p={[noip ? ['no IP address ', sg(ig.querier_mac)] : sg(ig.querier), qwho ? [' ', mut('· ' + qwho)] : '']}/>
       <Ln p={['IGMPv' + ig.version, (ig.interval_s || ig.qqi_s) ? 'every ' + (ig.interval_s || ig.qqi_s) + ' s' : '',
@@ -60,9 +60,9 @@
     {@render router()}
   </ProtoCard>
 {:else if !inUse}
-  <ProtoCard key="mcast" icon="wave" {title} state={w ? 'listen' : 'none'} summary={waitSum}/>
+  <ProtoCard key="mcast" icon="mcast" {title} state={w ? 'listen' : 'none'} summary={waitSum}/>
 {:else}
-  <ProtoCard key="mcast" icon="wave" {title} state={w ? 'listen' : 'heard'} summary={waitSum}>
+  <ProtoCard key="mcast" icon="mcast" {title} state={w ? 'listen' : 'heard'} summary={waitSum}>
     <Kv k="IGMP querier" wide><span class="say">none seen{up ? ' in ' + fmtDur(up) : ''}</span><Ln p={reports}/></Kv>
     {@render router()}
   </ProtoCard>

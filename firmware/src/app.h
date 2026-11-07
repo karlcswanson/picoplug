@@ -21,7 +21,7 @@ size_t app_last_frame(int kind, const uint8_t **frame);
 const stp_state_t *app_stp_state(void);
 /* 802.1X (EAPOL) frames the port has sent since the last link-up. */
 const eapol_state_t *app_dot1x_state(void);
-/* LACPDUs the port has sent since the last link-up (port-channel member). */
+/* LACPDUs the port has sent since the last link-up (LAG member). */
 const lacp_state_t *app_lacp_state(void);
 const uint8_t *app_eth_mac(void);       /* our Ethernet MAC, 6 bytes */
 /* IGMP querier and PTP master seen on the port since the last link-up. */

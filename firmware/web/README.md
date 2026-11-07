@@ -15,7 +15,7 @@ Layout:
 * `src/app.css` - the shipping page's styles; the card footer now wraps its buttons under the text when both don't fit
 * `src/App.svelte` - tabs and the order of the Port tab's cards
 * `src/Header.svelte` - header band, link lights, tabs
-* `src/cards/` - one file per card: switch, Network, spanning tree, port channel,
+* `src/cards/` - one file per card: switch, Network, spanning tree, LAG,
   802.1X, IGMP/PIM, PTP, other probes, Listening, No link, Last port
 * `src/views/` - the Tools, Log and Setup tabs
 * `src/lib/` - polling (`status.svelte.js`), tab and settings state (`app.svelte.js`),
