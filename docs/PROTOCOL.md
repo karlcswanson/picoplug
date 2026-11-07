@@ -243,10 +243,11 @@ probably off on it; the page says so.
 
 ## Ptp object
 
-IEEE 1588 PTP seen on the port since link-up: v1 (used by Dante for its
-own clocking) and v2 (AES67, Dante Domain Manager, SMPTE 2059-2 for
-ST 2110, gPTP over layer 2) are tracked separately because Dante sites
-run both at once with different masters. The device joins 224.0.1.129
+IEEE 1588 PTP seen on the port since link-up. v1 (IEEE 1588-2002) and
+v2 (IEEE 1588-2008 and later) are tracked separately because a network
+can carry both at once with different masters. Fields report what is in
+the messages; the page does not name the system or profile behind them.
+The device joins 224.0.1.129
 so a snooping switch forwards PTP to it; layer-2 PTP (EtherType 0x88F7)
 needs no join. Presence and identity only: the hardware cannot
 timestamp, so no offset or jitter figures. Always present.
@@ -256,13 +257,13 @@ timestamp, so no offset or jitter figures. Always present.
 | `seen` | bool | Either version seen. |
 | `v1`, `v2` | object | One per version seen, fields below. |
 | `transport` | string | `udp` (319/320) or `l2` (0x88F7). |
-| `domain` | int | v2 domainNumber of the first message seen (0 default and AES67, 127 SMPTE 2059-2); 0 for v1. |
-| `subdomain` | string | v1 only: the PTP subdomain name, `_DFLT` for Dante's default clock domain. |
+| `domain` | int | v2 domainNumber of the first message seen; 0 for v1. |
+| `subdomain` | string | v1 only: the PTP subdomain name as sent (`_DFLT` is the v1 default). |
 | `other_domains` | int | Messages in a different domain than `domain`, present when non-zero (a second clock domain on the VLAN). |
 | `syncs`, `announces`, `follow_ups`, `delay_reqs` | int | Message counts (the last two only when non-zero). `delay_reqs` are slaves talking, so they show a populated port. |
 | `master`, `master_ip`, `master_mac` | string | The clock sending Sync: v2 clock identity (8 bytes) or v1 UUID (6 bytes), and its addresses. With a boundary clock this differs from the grandmaster. |
 | `two_step` | bool | Sync carries the two-step flag (Follow_Up carries the timestamp). |
-| `sync_interval_ms`, `log_sync_interval` | int | Measured time between the last two Syncs, and the advertised log2 interval (v2; -3 = 8/s as in AES67 and Dante). |
+| `sync_interval_ms`, `log_sync_interval` | int | Measured time between the last two Syncs, and the advertised log2 interval (v2; -3 = 8/s). |
 | `first_s`, `last_sync_s` | int | Seconds since the first message and the last Sync. |
 | `grandmaster` | object | v2 only, from Announce: `id`, `priority1`, `priority2`, `clock_class` (6 = locked to a primary reference such as GPS, 248 = default free-running), `clock_accuracy`, `time_source` (`gps`, `ptp`, `ntp`, `oscillator`, ...), `steps_removed` (0 = the master is the grandmaster), `utc_offset`, `log_announce_interval`, `changes` (grandmaster identity changed, present when non-zero), `last_s`. |
 | `generation` | int | Bumps on first sight, a new master, and Announce field changes. |

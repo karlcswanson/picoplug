@@ -10,11 +10,9 @@
   let w = $derived(waiting(up, 5));
   let rows = $derived(!pt || !pt.seen ? [] : ['v1', 'v2'].filter(v => pt[v]).map(v => {
     const x = pt[v], gm = x.grandmaster, v1 = v === 'v1';
-    const what = v1 ? ['PTPv1 · Dante clock', x.subdomain ? [' ', mut(x.subdomain)] : '']
-      : 'PTPv2 · ' + (x.transport === 'l2' ? 'layer 2'
-        : x.domain === 127 ? 'domain 127 (SMPTE 2059)'
-        : x.domain === 0 ? 'domain 0 (AES67 / default)'
-        : 'domain ' + x.domain);
+    // what is on the wire only: version, domain or subdomain, transport
+    const what = v1 ? ['PTPv1', x.subdomain ? [' · subdomain ', mut(x.subdomain)] : '']
+      : 'PTPv2 · domain ' + x.domain + ' · ' + (x.transport === 'l2' ? 'layer 2' : 'UDP');
     const l2 = [x.master ? sg(x.master, 'master') : '', x.master_ip ? sg(x.master_ip) : ''];
     // measured from message gaps, so it varies: own line
     const sync = x.sync_interval_ms < 1000 ? x.sync_interval_ms + ' ms' : (x.sync_interval_ms / 1000).toFixed(1) + ' s';
@@ -29,7 +27,7 @@
       if (gm.changes) l3.push('changed ' + gm.changes + '×');
     }
     if (x.other_domains) l3.push(x.other_domains + ' in other domains');
-    const sum = (v1 ? 'Dante v1' : 'v2' + (x.transport !== 'l2' && x.domain !== undefined ? ' domain ' + x.domain : ''))
+    const sum = (v1 ? 'v1' + (x.subdomain ? ' ' + x.subdomain : '') : 'v2 domain ' + x.domain)
       + (x.master_ip ? ' · ' + x.master_ip : '');
     return { k: v1 ? 'PTP v1' : 'PTP v2', copy: x.master_ip || x.master || '', what, l2, ls, l3, sum };
   }));
