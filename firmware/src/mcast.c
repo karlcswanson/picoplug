@@ -47,6 +47,7 @@ bool igmp_parse(const uint8_t *frame, size_t len, igmp_msg_t *out)
     if (igmp_len < 8) return false;
     memcpy(out->src_mac, frame + 6, 6);
     memcpy(out->src_ip, src, 4);
+    if (frame[12] == 0x81 && frame[13] == 0x00) out->vlan = (uint16_t)((frame[14] << 8 | frame[15]) & 0x0FFF);
     out->type = frame[o];
     memcpy(out->group, frame + o + 4, 4);
     if (out->type == 0x11) {
@@ -107,12 +108,30 @@ void igmp_state_pim(igmp_state_t *s, const pim_msg_t *m, uint32_t now_ms)
     if (changed) s->generation++;
 }
 
+static void note_other_vlan(igmp_state_t *s, uint16_t vlan)
+{
+    for (int i = 0; i < s->n_other_vlans; i++) if (s->other_vlans[i] == vlan) return;
+    if (s->n_other_vlans >= IGMP_OTHER_VLANS_MAX) return;
+    s->other_vlans[s->n_other_vlans++] = vlan;
+    s->generation++;
+}
+
 void igmp_state_update(igmp_state_t *s, const igmp_msg_t *m, uint32_t now_ms)
 {
     if (m->type != 0x11) {
         if (m->type == 0x12 || m->type == 0x16 || m->type == 0x22) s->reports++;
         return;
     }
+    if (s->seen && m->vlan != s->vlan) {
+        if (m->vlan != 0) { note_other_vlan(s, m->vlan); return; }
+        /* the port's own untagged VLAN has a querier: follow that one from now on */
+        note_other_vlan(s, s->vlan);
+        s->seen = false;
+        s->queries = s->group_queries = s->querier_changes = 0;
+        s->interval_ms = 0;
+        memset(s->prev_querier_ip, 0, 4);
+    }
+    if (!s->seen) s->vlan = m->vlan;
     static const uint8_t any[4] = {0, 0, 0, 0};
     if (memcmp(m->group, any, 4) != 0) { s->group_queries++; return; }
     if (s->seen && memcmp(s->querier_ip, m->src_ip, 4) != 0) { s->querier_changes++; memcpy(s->prev_querier_ip, s->querier_ip, 4); }

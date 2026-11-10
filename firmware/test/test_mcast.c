@@ -286,6 +286,34 @@ static int test_tracker(void)
     return 0;
 }
 
+/* Queries from several VLANs on one port (a trunk, or a voice VLAN): the querier and its
+ * interval come from one VLAN, untagged winning; the others are only listed. */
+static int test_vlans(void)
+{
+    uint8_t f[256];
+    igmp_state_t g; igmp_state_reset(&g);
+    igmp_msg_t q;
+    const uint8_t q2[] = {0x11, 100, 0, 0, 0, 0, 0, 0};
+    /* tagged (VLAN 10) first: followed until an untagged one turns up */
+    size_t n = ipv4_frame(f, true, true, SW, QIP, ALL_HOSTS, 2, q2, sizeof q2);
+    CHECK(igmp_parse(f, n, &q)); CHECK_EQ(q.vlan, 10);
+    igmp_state_update(&g, &q, 1000);
+    CHECK(g.seen); CHECK_EQ(g.vlan, 10); CHECK_EQ(g.n_other_vlans, 0);
+    n = ipv4_frame(f, false, true, SW, QIP, ALL_HOSTS, 2, q2, sizeof q2);
+    CHECK(igmp_parse(f, n, &q)); CHECK_EQ(q.vlan, 0);
+    igmp_state_update(&g, &q, 1005);
+    CHECK_EQ(g.vlan, 0); CHECK_EQ(g.queries, 1); CHECK_EQ(g.interval_ms, 0);
+    CHECK_EQ(g.n_other_vlans, 1); CHECK_EQ(g.other_vlans[0], 10);
+    /* a burst of tagged queries right after: listed once each, the interval untouched */
+    uint32_t gen = g.generation;
+    for (int i = 0; i < 3; i++) { n = ipv4_frame(f, true, true, SW, QIP, ALL_HOSTS, 2, q2, sizeof q2); igmp_parse(f, n, &q); igmp_state_update(&g, &q, 1010u + (uint32_t)i); }
+    CHECK_EQ(g.queries, 1); CHECK_EQ(g.interval_ms, 0); CHECK_EQ(g.n_other_vlans, 1); CHECK_EQ(g.generation, gen);
+    n = ipv4_frame(f, false, true, SW, QIP, ALL_HOSTS, 2, q2, sizeof q2);
+    igmp_parse(f, n, &q); igmp_state_update(&g, &q, 126005);
+    CHECK_EQ(g.queries, 2); CHECK_EQ(g.interval_ms, 125000); CHECK_EQ(g.querier_changes, 0);
+    return 0;
+}
+
 int main(int argc, char **argv)
 {
     if (argc < 2) { fprintf(stderr, "usage: %s igmp|ptp|bounds|tracker\n", argv[0]); return 2; }
@@ -293,6 +321,7 @@ int main(int argc, char **argv)
     if (!strcmp(argv[1], "ptp")) return test_ptp();
     if (!strcmp(argv[1], "bounds")) return test_bounds();
     if (!strcmp(argv[1], "tracker")) return test_tracker();
+    if (!strcmp(argv[1], "vlans")) return test_vlans();
     fprintf(stderr, "unknown test %s\n", argv[1]);
     return 2;
 }

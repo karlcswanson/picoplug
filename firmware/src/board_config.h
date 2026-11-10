@@ -98,6 +98,8 @@
 #define API_TCP_PORT            9000
 #define API_MAX_CLIENTS         4
 #define API_HEARTBEAT_MS        2000
+#define API_MIN_GAP_MS          250     /* pushes come at most this often, however busy the port */
+#define WS_MAX_CLIENTS          4       /* WebSocket clients on :80/ws, besides the :9000 ones */
 #define HTTP_TCP_PORT           80
 #define HTTP_MAX_CLIENTS        4
 

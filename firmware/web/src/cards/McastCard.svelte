@@ -15,6 +15,9 @@
   let noip = $derived(ig.querier === '0.0.0.0');
   let qwho = $derived(ig.seen ? whoIs(noip ? '' : ig.querier, ig.querier_mac) : '');
   let rwho = $derived(ig.mrouter ? whoIs(ig.mrouter.ip, ig.mrouter.mac) : '');
+  // a trunk or voice VLAN carries one querier per VLAN: the row is for one of them
+  let vlans = $derived([ig.vlan ? 'in tagged VLAN ' + ig.vlan : '',
+    ig.other_vlans && ig.other_vlans.length ? 'also queries in VLAN' + (ig.other_vlans.length > 1 ? 's ' : ' ') + ig.other_vlans.join(', ') : '']);
   let reports = $derived(ig.reports ? ig.reports + ' report' + (ig.reports > 1 ? 's' : '') + ' from others' : '');
   let querierSum = $derived((noip ? 'querier, no IP' : 'querier ' + ig.querier) + ' · v' + ig.version);
   let waitSum = $derived(w ? w + ' of 2 min' : 'no querier in ' + fmtDur(up));
@@ -51,6 +54,7 @@
         ig.max_resp_ds ? 'answer within ' + (ig.max_resp_ds / 10) + ' s' : '',
         ig.qrv ? 'robustness ' + ig.qrv : '', ig.s_flag ? 'S flag' : '']}/>
       <Ln p={'last ' + fmtAgo(ig.last_s)}/>
+      <Ln p={vlans}/>
       <Ln p={[!noip && !qwho ? sg(ig.querier_mac) : '',
         ig.querier_changes
           ? ['querier changed ' + ig.querier_changes + '×', ig.prev_querier ? [', was ', sg(ig.prev_querier)] : '']

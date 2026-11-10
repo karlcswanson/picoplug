@@ -37,7 +37,7 @@ export function summary(n) {
   if (n.mgmt_addr) L.push('Mgmt: ' + n.mgmt_addr.join(', '));
   if (n.pvid !== undefined) L.push('PVID: ' + n.pvid);
   if (n.vlans) L.push('VLANs: ' + n.vlans.map(v => v.id + ' ' + v.name).join(', '));
-  if (n.voice_vlan) L.push('Voice VLAN: ' + n.voice_vlan.id + (n.voice_vlan.tagged ? ' tagged' : '') + ' dscp ' + n.voice_vlan.dscp);
+  if (n.voice_vlan) L.push('Voice VLAN: ' + n.voice_vlan.id + (n.voice_vlan.tagged ? ' tagged' : '') + (n.voice_vlan.dscp !== undefined ? ' dscp ' + n.voice_vlan.dscp : ''));
   if (n.poe) L.push('PoE: ' + (n.poe.class !== undefined ? 'class ' + n.poe.class : '')
     + (n.poe.alloc_w !== undefined ? ', ' + n.poe.alloc_w + ' W allocated' : '')
     + (n.poe.req_w !== undefined ? ', ' + n.poe.req_w + ' W requested' : ''));

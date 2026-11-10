@@ -247,6 +247,7 @@ cdp_result_t cdp_parse(const uint8_t *frame, size_t len, lldp_neighbor_t *out)
                 memset(pol, 0, sizeof *pol);
                 pol->app_type = LLDP_MED_APP_VOICE;
                 pol->tagged = true;
+                pol->no_qos = true;           /* CDP carries the VLAN only */
                 pol->vlan_id = rd16(v + 1) & 0x0FFF;
             } else record_unknown(out, type, v, vlen);
             break;

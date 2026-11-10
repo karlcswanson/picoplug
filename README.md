@@ -24,13 +24,16 @@ What the page answers:
   test whether the run between them is a direct cable or goes through a
   switch.
 * **History** of every port visited, kept in the browser, exportable as CSV.
-* **Form link:** a Form button that opens your own web form (a NOC
-  request form, a ticket) with the switch, port and VLAN filled in.
+* **Share:** a Share button that links the port to the picoplug share
+  page, which shows it to whoever opens the link, or copies it as text.
+  The link can point at your own web form instead (a NOC request form, a
+  ticket) with the switch, port and VLAN filled in.
 
 The same page is served read-only on the port's own DHCP address, so the
 tester can be left on a far port with USB power and read from a laptop on
-the network. A raw NDJSON status stream is on TCP :9000 (USB side) for
-scripts.
+the network. The page gets every change pushed over a WebSocket (`/ws`),
+so it updates as the tester hears things. A raw NDJSON status stream is on
+TCP :9000 (USB side) for scripts.
 
 On Android, turn Wi-Fi off while using the tester: with Wi-Fi on, Android
 sends the browser over Wi-Fi and the page at 192.168.7.1 can't be reached.

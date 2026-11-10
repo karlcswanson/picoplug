@@ -409,7 +409,7 @@ static int test_extras(void)
     CHECK_EQ(p->pse_max_dw, 900);
     CHECK(n.has_eee); CHECK_EQ(n.eee_tx_us, 17); CHECK_EQ(n.eee_rx_us, 16);
     CHECK_EQ(n.location_format, LLDP_LOC_CIVIC);
-    CHECK_STR(n.location, "CA, San Jose, 170, W Tasman Dr, Floor 2, Room B12, US");
+    CHECK_STR(n.location, "Room B12, Floor 2, 170 W Tasman Dr, San Jose, CA, US");
     CHECK_STR(n.mud_url, "https://example.com/mud/device");
     CHECK_EQ(n.n_unknown, 0);
     CHECK(!n.truncated);

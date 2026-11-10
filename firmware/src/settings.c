@@ -97,6 +97,11 @@ bool settings_decode(const uint8_t *buf, size_t len, settings_t *out)
     if (ver >= 5) p++;
     if (ver >= 6) { memcpy(s.form_url, p, SETTINGS_FORM_URL_MAX + 1); s.form_url[SETTINGS_FORM_URL_MAX] = '\0'; }
     else strncpy(s.form_url, SETTINGS_DEFAULT_FORM_URL, sizeof s.form_url - 1);
+    /* the default before the share page existed: a saved copy of it moves to the new default */
+    if (strcmp(s.form_url, "https://mdn.github.io/dom-examples/url-params/?switch={switch}&switch_ip={switch_ip}&port={port}&vlan={vlan}") == 0) {
+        memset(s.form_url, 0, sizeof s.form_url);
+        strncpy(s.form_url, SETTINGS_DEFAULT_FORM_URL, sizeof s.form_url - 1);
+    }
     s.ping_target[15] = s.dns_server[15] = s.dns_name[SETTINGS_DNS_NAME_MAX] = '\0';
     uint8_t ip[4];
     if (!settings_parse_ip(s.ping_target, ip)) return false;
