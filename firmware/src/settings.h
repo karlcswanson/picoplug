@@ -17,7 +17,8 @@
 #define SETTINGS_PROBE_NONE 0xFF  /* no probe number set                  */
 #define SETTINGS_FORM_URL_MAX 255
 /* {name} placeholders are filled in by the page; see docs/PROTOCOL.md */
-#define SETTINGS_DEFAULT_FORM_URL "https://mdn.github.io/dom-examples/url-params/?switch={switch}&switch_ip={switch_ip}&port={port}&vlan={vlan}"
+/* the picoplug share page; {share} is every port detail as name=value pairs (see the Share link in docs/PROTOCOL.md) */
+#define SETTINGS_DEFAULT_FORM_URL "https://clockclub.net/apps/picoplug/#{share}"
 
 typedef struct {
     char ping_target[16];           /* IPv4 dotted, never empty            */
@@ -26,7 +27,7 @@ typedef struct {
     bool lldp_on, cdp_on;           /* advertise at boot                   */
     char usb_ip[16];                /* the device's own address on the USB link; /24, host gets .ip+1 */
     uint8_t probe;                  /* 0-9, colored by the resistor code; SETTINGS_PROBE_NONE unset */
-    char form_url[SETTINGS_FORM_URL_MAX + 1];   /* link template for the Port view's form button, "" = no button */
+    char form_url[SETTINGS_FORM_URL_MAX + 1];   /* link template behind the Port view's Share button, "" = no link */
 } settings_t;
 
 #define SETTINGS_BLOB_MAX 512       /* encoded size never exceeds this     */

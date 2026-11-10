@@ -15,11 +15,13 @@ export function copyText(s) {
 function legacy(s) {
   const ta = document.createElement('textarea');
   ta.value = s; ta.setAttribute('readonly', ''); ta.style.cssText = 'position:fixed;left:-9999px;top:0';
-  document.body.appendChild(ta);
+  // an open modal dialog (the Share sheet) makes the rest of the page inert: the text box has to be inside it
+  const host = document.querySelector('dialog[open]') || document.body;
+  host.appendChild(ta);
   ta.focus(); ta.select(); ta.setSelectionRange(0, s.length);
   let ok = false;
   try { ok = document.execCommand('copy'); } catch (e) {}
-  document.body.removeChild(ta);
+  ta.remove();
   if (ok) say('Copied');
   else { app.fallback = s; app.fbFocus = true; go('#log'); say('Copy manually'); }
   return Promise.resolve(ok);

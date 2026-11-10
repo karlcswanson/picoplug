@@ -176,6 +176,20 @@ static int fmt_fixed(char *out, size_t cap, int64_t v, unsigned fbits, unsigned 
                     (int)digits, (unsigned long)(scaled % scale));
 }
 
+/* Civic address elements (RFC 4776 CAtypes) in the order they are written out, like a postal
+ * address read from the inside: seat, room, floor, building, street, city, state and postal code.
+ * One group per entry, its elements joined by spaces; a group is one ", "-separated part. */
+static const struct { uint8_t types[8]; const char *pre; } CIVIC_ORDER[] = {
+    {{33}, "Seat "}, {{28}, "Room "}, {{27}, "Floor "}, {{26}, "Unit "},
+    {{23}, ""}, {{25}, ""}, {{21}, ""}, {{22}, ""},
+    {{19, 20, 16, 38, 34, 39, 18, 17}, ""},     /* 400 W Wacker Dr */
+    {{35}, ""}, {{36}, ""}, {{37}, ""}, {{31}, ""},
+    {{5}, ""}, {{4}, ""}, {{3}, ""}, {{30}, ""}, {{2}, ""},
+    {{1, 24}, ""},                                /* IL 60606 */
+    {{32}, ""}, {{29}, ""},
+};
+#define CIVIC_MAX_TYPE 39
+
 /* LLDP-MED Location Identification: format(1) | data. Coordinates (RFC 6225
  * 16-byte LCI), civic address (RFC 4776 elements) or ELIN (digits). Stored as
  * one readable line. */
@@ -187,6 +201,7 @@ static bool decode_location(lldp_neighbor_t *out, const uint8_t *v, size_t vlen)
     const uint8_t *d = v + 1;
     size_t n = vlen - 1;
     s[0] = '\0';
+    out->civic_len = 0;
     switch (v[0]) {
     case LLDP_LOC_COORD: {
         if (n < 16) return false;
@@ -214,17 +229,39 @@ static bool decode_location(lldp_neighbor_t *out, const uint8_t *v, size_t vlen)
         size_t end = 1 + (size_t)d[0];
         char cc[3] = {(char)d[2], (char)d[3], 0};
         bool cut = false;
+        /* first value of each address element; language (0), script (128) and anything outside
+         * the RFC's list (Cisco adds 201, its own IP in binary, and 202, the port name) are skipped */
+        const uint8_t *val[CIVIC_MAX_TYPE + 1] = {0};
+        uint8_t elen[CIVIC_MAX_TYPE + 1] = {0};
         for (size_t p = 4; p + 2 <= end; ) {
             uint8_t type = d[p], len = d[p + 1];
             if (p + 2 + len > end) return false;
-            const uint8_t *val = &d[p + 2];
+            if (type >= 1 && type <= CIVIC_MAX_TYPE && len && !val[type]) { val[type] = &d[p + 2]; elen[type] = len; }
             p += 2 + (size_t)len;
-            if (type == 0 || type == 128 || len == 0) continue;   /* language, script */
-            const char *pre = type == 26 ? "Unit " : type == 27 ? "Floor " : type == 28 ? "Room " :
-                              type == 33 ? "Seat " : "";
-            if (s[0]) cut |= append_str(s, cap, ", ", 2);
-            cut |= append_str(s, cap, pre, strlen(pre));
-            cut |= append_str(s, cap, (const char *)val, len);
+        }
+        /* the elements as sent, for the JSON's field list; cut at an element boundary if too long */
+        out->civic_len = 0;
+        for (size_t p = 4; p + 2 <= end; ) {
+            size_t el = 2 + (size_t)d[p + 1];
+            if (2 + (p - 4) + el > LLDP_MAX_CIVIC) { cut = true; break; }
+            p += el;
+            out->civic_len = (uint8_t)(2 + (p - 4));
+        }
+        if (out->civic_len < 2) out->civic_len = 2;
+        memcpy(out->civic, d + 2, out->civic_len);
+        if (!val[34] && val[6]) { val[34] = val[6]; elen[34] = elen[6]; }   /* street group stands in for the road */
+        for (size_t g = 0; g < sizeof CIVIC_ORDER / sizeof CIVIC_ORDER[0]; g++) {
+            bool started = false;
+            for (int i = 0; i < 8 && CIVIC_ORDER[g].types[i]; i++) {
+                uint8_t t = CIVIC_ORDER[g].types[i];
+                if (!val[t]) continue;
+                if (!started) {
+                    if (s[0]) cut |= append_str(s, cap, ", ", 2);
+                    cut |= append_str(s, cap, CIVIC_ORDER[g].pre, strlen(CIVIC_ORDER[g].pre));
+                    started = true;
+                } else cut |= append_str(s, cap, " ", 1);
+                cut |= append_str(s, cap, (const char *)val[t], elen[t]);
+            }
         }
         if (cc[0] && cc[1]) {
             if (s[0]) cut |= append_str(s, cap, ", ", 2);

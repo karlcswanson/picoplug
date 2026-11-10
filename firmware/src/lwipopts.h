@@ -12,10 +12,10 @@
 #define LWIP_TIMERS                     1
 
 #define MEM_ALIGNMENT                   4
-#define MEM_SIZE                        (16 * 1024)
+#define MEM_SIZE                        (24 * 1024)   /* each pushed status is copied per client */
 #define MEMP_NUM_PBUF                   16
 #define MEMP_NUM_UDP_PCB                8      /* dns, mdns, dhcp client, dhcp server + headroom */
-#define MEMP_NUM_TCP_PCB                12
+#define MEMP_NUM_TCP_PCB                16     /* 4 HTTP + 4 :9000 + 4 WebSocket + closing ones */
 #define MEMP_NUM_TCP_PCB_LISTEN         4
 #define MEMP_NUM_TCP_SEG                48
 /* lwIP's computed default (LWIP_NUM_SYS_TIMEOUT_INTERNAL) covers TCP, ARP,

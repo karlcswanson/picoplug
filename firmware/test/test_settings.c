@@ -29,6 +29,15 @@ static int test_roundtrip(void)
     memset(&d, 0xAA, sizeof d);
     CHECK(settings_decode(buf, n, &d));
     CHECK(memcmp(&s, &d, sizeof s) == 0);
+    /* a saved copy of the old default link (MDN's echo page) comes back as the share page */
+    {
+        settings_t o = s;
+        memset(o.form_url, 0, sizeof o.form_url);
+        strcpy(o.form_url, "https://mdn.github.io/dom-examples/url-params/?switch={switch}&switch_ip={switch_ip}&port={port}&vlan={vlan}");
+        uint8_t ob[SETTINGS_BLOB_MAX];
+        size_t on = settings_encode(&o, ob, sizeof ob);
+        CHECK(settings_decode(ob, on, &d)); CHECK_STR(d.form_url, SETTINGS_DEFAULT_FORM_URL);
+    }
     /* decode with a bigger window (flash is 0xFF after the blob) */
     uint8_t big[SETTINGS_BLOB_MAX + 32]; memset(big, 0xFF, sizeof big); memcpy(big, buf, n);
     CHECK(settings_decode(big, sizeof big, &d));

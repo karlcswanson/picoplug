@@ -8,7 +8,7 @@
 </script>
 
 <script>
-  // Probe number, what the tester advertises, theme, device facts, port-check settings, Form link.
+  // Probe number, what the tester advertises, theme, device facts, port-check settings, Share link.
   import Icon from '../lib/Icon.svelte';
   import Kv from '../lib/Kv.svelte';
   import { conn } from '../lib/status.svelte.js';
@@ -21,7 +21,7 @@
   let formText = $state(app.form), formEl;
   let theme = $state((() => { try { return localStorage.getItem('picolldp.theme') || 'auto'; } catch (e) { return 'auto'; } })());
   let cdpNote = $derived(tx.cdp ? tx.cdp.frames + ' sent' + (tx.cdp.enabled && !tx.cdp.peer ? ' · no CDP switch' : '') : '');
-  let preview = $derived(formText.trim() ? formFill(formText.trim(), formVals(s, current())) : 'no button');
+  let preview = $derived(formText.trim() ? formFill(formText.trim(), formVals(s, current())) : 'no link');
 
   function fill(j) {
     f.probe = f.probeSaved = isP(j.probe) ? String(j.probe) : ''; f.lldp = !!j.lldp; f.cdp = !!j.cdp;
@@ -123,13 +123,13 @@
   </div>
 </div>
 <div class="card">
-  <div class="chead"><span class="sec"><Icon name="form" size="s"/>Form</span></div>
-  <div class="ln" style="margin:0 0 8px">Form button link · blank = no button</div>
+  <div class="chead"><span class="sec"><Icon name="share" size="s"/>Share</span></div>
+  <div class="ln" style="margin:0 0 8px">Where the Share sheet's link goes · blank = no link, copy only</div>
   <label class="fl" for="s_form">Link</label>
   <input class="in" id="s_form" inputmode="url" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false"
     bind:this={formEl} bind:value={formText} onkeydown={e => enter(e, formSave)}>
   <div class="ln" style="margin-top:8px">
-    Fill-ins: <span class="mono">{'{switch} {switch_ip} {port} {port_desc} {vlan} {voice_vlan} {ip} {gateway} {probe}'}</span>
+    Fill-ins: <span class="mono">{'{share} {switch} {switch_ip} {port} {port_desc} {vlan} {voice_vlan} {ip} {gateway} {probe}'}</span>
   </div>
   <div class="ln" style="margin-top:8px">Now: <span class="mono" style="word-break:break-all">{preview}</span></div>
   <div class="crow" style="margin-top:12px">

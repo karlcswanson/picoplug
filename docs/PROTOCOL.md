@@ -1,15 +1,16 @@
 # picolldp status protocol
 
-The firmware exposes the same status document two ways:
+The firmware exposes the same status document three ways:
 
 | Transport | Where | Behaviour |
 |-----------|-------|-----------|
-| NDJSON stream | TCP 192.168.7.1:9000 | One JSON object per line. A status message is sent immediately on connect, then whenever something changes, plus a heartbeat every 2 s. Up to 4 clients. |
+| NDJSON stream | TCP 192.168.7.1:9000 | One JSON object per line. A status message is sent immediately on connect, then whenever something changes, plus a heartbeat every 2 s; at most one message per 250 ms. Up to 4 clients. |
+| WebSocket | `ws://192.168.7.1/ws` | The same messages as the NDJSON stream, one text frame each. Read-only: the server answers ping with pong and close with close, and ignores anything else; client frames over 125 bytes drop the connection. Up to 4 clients besides the NDJSON ones; a fifth gets 503. |
 | HTTP | `GET http://192.168.7.1/status.json` | One status object, `Content-Type: application/json`, `Cache-Control: no-store`, CORS `*`. |
-| HTML | `GET http://192.168.7.1/` | Built-in viewer page that polls `/status.json`. |
+| HTML | `GET http://192.168.7.1/` | Built-in viewer page. It takes the WebSocket and polls `/status.json` every 2 s only while the socket is down (or silent for 5 s). |
 
 The NDJSON stream listens on the USB link only. HTTP also answers on the
-port's own DHCP address, read-only: `/`, `/status.json`, `/frame`, the icon
+port's own DHCP address, read-only: `/`, `/status.json`, `/ws`, `/frame`, the icon
 and the manifest; every other path is refused there with 403. That is how
 the tester works as a remote probe: leave it on a far port with USB power
 and open its address from a laptop on the network.
@@ -226,6 +227,8 @@ or time the groups out. Passive: the device itself only joins
 | `qrv`, `s_flag` | int, bool | IGMPv3 only: the querier's robustness variable and the suppress-router-side-processing flag. |
 | `interval_s` | int | Measured time between the last two general queries (usually 125). |
 | `qqi_s` | int | The querier's query interval as advertised in an IGMPv3 query. |
+| `vlan` | int | The VLAN tag of the queries above; absent when they are untagged. A trunk or a voice VLAN brings one querier per VLAN: only one VLAN's queries make up `querier`, `queries` and `interval_s`, the untagged one once heard. |
+| `other_vlans` | [int] | Other VLANs whose queries arrived tagged on the port (up to 16), listed only. |
 | `max_resp_ds` | int | Max response time in tenths of a second. |
 | `first_s`, `last_s` | int | Seconds since the first and last general query. |
 | `mrouter` | object | A multicast router heard via PIMv2 Hello on 224.0.0.13: `ip`, `mac`, `hellos`, `holdtime_s`, `dr_priority`, `last_s`. Present whenever one was heard, even with no querier. |
@@ -361,8 +364,8 @@ Every field the LLDP parser decoded. Absent means the TLV was not present.
 | `ppvids` | [{`id`,`supported`,`enabled`}] | 802.1 Port and Protocol VLAN IDs, up to 4. |
 | `protocols` | string | 802.1 Protocol Identity TLVs, named and comma-joined (`STP`/`RSTP`/`MSTP`, `LACP`, `802.1X`, `LLDP`, `CDP`, `PVST+`, …); others as `0x` EtherType or `LLC 0x` SAP. Repeats are listed once. |
 | `vlans` | [{`id`,`name`}] | 802.1 VLAN Name TLVs, up to 32. |
-| `voice_vlan` | {`id`,`tagged`,`priority`,`dscp`,`unknown_policy?`} | LLDP-MED Network Policy with application type *voice*. |
-| `med_policies` | [{`app`,`id`,`tagged`,`priority`,`dscp`}] | All MED network policies (up to 4). `app` is `voice`, `voice_signaling`, `guest_voice`, …. |
+| `voice_vlan` | {`id`,`tagged`,`priority?`,`dscp?`} | LLDP-MED Network Policy with application type *voice*, or CDP's VoIP VLAN (VLAN only: CDP sends no priority or DSCP, so those are absent). Absent when that policy has the unknown-policy flag set (the switch has no voice VLAN on the port); `med_policies` still lists it. |
+| `med_policies` | [{`app`,`id`,`tagged`,`priority`,`dscp`,`unknown_policy?`}] | All MED network policies (up to 4). `unknown_policy` is true when the switch flags the policy as not defined. `app` is `voice`, `voice_signaling`, `guest_voice`, …. |
 | `poe` | object | 802.3 Power via MDI. `port_class`: `pse`/`pd`; `supported`, `enabled`: bool; `pairs`: `signal`/`spare`; `class`: 0–4; with 802.3at extension: `req_w`, `alloc_w` (decimal watts), `priority` (`critical`/`high`/`low`/`unknown`), `type` (0 Type 2 PSE, 1 Type 2 PD, 2 Type 1 PSE, 3 Type 1 PD), `pd_4pid` (true when the PD supports power on both pairs). With the 802.3bt extension, `bt`: `class` (1–8, or `"dual"`), `class_a`/`class_b` (dual-signature, 1–5), `type` (3 or 4), `device` (`pse`/`pd`), `powering` (`2-pair`/`4-pair single`/`4-pair dual`), `pd` (`single`/`2-pair dual`/`4-pair dual`), `pairs` (`a`/`b`/`both`), `req_a_w`, `req_b_w`, `alloc_a_w`, `alloc_b_w`, `max_w`, `pd_load`; each only when sent non-zero. |
 | `upoe` | {`supported`,`altb_detect`,`spare_desired`,`spare_on`} | Cisco 4-pair PoE TLV (OUI 00-01-42 subtype 1). |
 | `med_power` | {`source`,`w`,`priority`} | LLDP-MED Extended Power via MDI. |
@@ -372,7 +375,7 @@ Every field the LLDP parser decoded. Absent means the TLV was not present.
 | `link_agg` | {`capable`,`active`,`port_id`} | Link Aggregation, from the 802.1 TLV (subtype 7) or the older 802.3 one (subtype 3). `port_id` only when the port is in an aggregate. |
 | `inventory` | {`serial`,`model`,`manufacturer`,`hw`,`fw`,`sw`,`asset`} | LLDP-MED inventory TLVs (subtypes 5-11), or a vendor TLV carrying the same: FortiSwitch serial (OUI 08-5b-0e subtype 2). Only the fields sent. |
 | `med` | {`caps`,`device_type`} | LLDP-MED Capabilities. |
-| `location` | {`format`,`text`} | LLDP-MED Location. `format`: `coordinates` (text `lat, long[, alt m]`), `civic` (address elements in the order sent, then country) or `elin`. |
+| `location` | {`format`,`text`,`country?`,`civic?`} | LLDP-MED Location. `format`: `coordinates` (text `lat, long[, alt m]`), `civic` or `elin`. For a civic address, `text` is one line in postal order (room, floor, building, street, city, state and postal code, country), `country` is the two-letter code, and `civic` lists every address element as sent: `[{"type":28,"value":"214"},…]`, `type` being the RFC 4776 CAtype (1 to 39; language, script and vendor-private elements are left out). |
 | `mud_url` | string | IANA MUD URL (RFC 8520, OUI 00-00-5e subtype 1). |
 | `unknown_tlvs` | int | TLVs the parser did not decode (vendor OUIs, MED inventory, …). |
 | `truncated` | bool | Some field was cut to fit a fixed buffer. |
@@ -408,25 +411,28 @@ Strings are ASCII; any byte outside 0x20–0x7E is escaped as `\u00XX`.
 | `GET /tool?path=1[&peer=MAC]` | Start the two-probe path test against `peer`, or against the only probe heard when `peer` is omitted. 400 with `No other probe heard on this port`, `Several probes heard; pick one`, `That probe is not in the peer list`, `No Ethernet link`, `The port blinker is running` or `A path test is already running`. Progress in the `path` object. The blinker refuses to start while a path test runs. |
 | `GET /tool?blink=1`, `GET /tool?blink=0` | Start the port blinker (32 s, stops itself) or stop it early. Independent of ping/trace; a ping running during a blink just loses probes. Progress in the `blink` object. 400 `Ethernet chip not ready` when the W5500 is absent. |
 | `GET /settings` | Current settings and the defaults: `{"ok":true,"error":"","saved":false,"ping_target":"1.1.1.1","dns_name":"clockclub.net","dns_server":"","lldp":true,"cdp":true,"probe":null,"usb_ip":"192.168.7.1","form_url":"https://...","defaults":{...}}`. |
-| `GET /settings?ping_target=A.B.C.D&dns_name=NAME&dns_server=A.B.C.D&usb_ip=A.B.C.D` | Validate, save to flash and rerun the port probe. Any subset of keys; values URL-encoded; `dns_server=` (empty) means use the DHCP-supplied resolver; `usb_ip` is the device's own address on the USB link (/24, the phone gets the next host address; applies at the next boot, the reply carries `running_ip` and `reboot_needed`); `lldp=`/`cdp=` turn advertising on or off now and at boot (the Settings card's two checkboxes); `probe=0`..`9` sets the probe number (`probe=` clears it), which changes the advertised LLDP system name / CDP device ID from `picoplug` to `picoplug-N` and sends a fresh burst; `form_url=` sets the Form link template (an `http://` or `https://` link up to 255 characters, no spaces, quotes or backslashes; empty = no button; default is the MDN URL-parameter echo page); `reset=1` restores defaults but keeps the probe number and the form link. Replies with the same object; on a bad value nothing is saved, status 400 and `error` names the field. The flash write holds interrupts for about 50 ms. |
+| `GET /settings?ping_target=A.B.C.D&dns_name=NAME&dns_server=A.B.C.D&usb_ip=A.B.C.D` | Validate, save to flash and rerun the port probe. Any subset of keys; values URL-encoded; `dns_server=` (empty) means use the DHCP-supplied resolver; `usb_ip` is the device's own address on the USB link (/24, the phone gets the next host address; applies at the next boot, the reply carries `running_ip` and `reboot_needed`); `lldp=`/`cdp=` turn advertising on or off now and at boot (the Settings card's two checkboxes); `probe=0`..`9` sets the probe number (`probe=` clears it), which changes the advertised LLDP system name / CDP device ID from `picoplug` to `picoplug-N` and sends a fresh burst; `form_url=` sets the Share link template (an `http://` or `https://` link up to 255 characters, no spaces, quotes or backslashes; empty = no link; default is the picoplug share page, see Share link); `reset=1` restores defaults but keeps the probe number and the Share link. Replies with the same object; on a bad value nothing is saved, status 400 and `error` names the field. The flash write holds interrupts for about 50 ms. |
 
 ## Quick checks
 
 ```
 nc 192.168.7.1 9000                 # stream
+websocat ws://192.168.7.1/ws         # the same stream as WebSocket frames
 curl -s http://192.168.7.1/status.json | python3 -m json.tool
 ```
 
-## Form link
+## Share link
 
-The Setup tab's Form card holds a URL template kept in flash (`form_url`).
-When it is set, the Switch card on the Port tab shows a Form button that opens the
-link in a new tab. The page replaces each `{name}` with the URL-encoded
-value from the neighbor shown on the Port tab and the lease. Unknown
-names are left as typed; a value the port does not have becomes empty.
+The Switch card on the Port tab has a Share button. It opens a sheet with an optional note, and
+opens or copies a link made from the Port tab, or copies the card as text. The link comes from a URL template kept
+in flash (`form_url`, set in Setup's Share card); empty means no link, copy only. The page
+replaces each `{name}` with the URL-encoded value from the neighbor shown on the Port tab and
+the lease. Unknown names are left as typed; a value the port does not have becomes empty. The
+read-only page on the port's own address cannot read Setup, so its link is always the default.
 
 | Fill-in | Value |
 | --- | --- |
+| `{share}` | Everything below as `name=value` pairs, already encoded |
 | `{switch}` | Neighbor system name, or its chassis ID |
 | `{switch_ip}` | Neighbor's first IPv4 management address |
 | `{port}` | Neighbor port as shown on the Port tab |
@@ -435,6 +441,34 @@ names are left as typed; a value the port does not have becomes empty.
 | `{voice_vlan}` | Voice VLAN ID |
 | `{ip}`, `{gateway}` | This tester's DHCP address and gateway, when bound |
 | `{probe}` | This tester's probe number |
+
+The default is the picoplug share page, `https://clockclub.net/apps/picoplug/#{share}`. The
+pairs go after `#`, which a browser never sends to the server, and the page shows the port from
+them. `{share}` holds, each only when known:
+
+| Name | Value |
+| --- | --- |
+| `sw` | Switch name, or its chassis ID |
+| `port`, `desc` | Port as shown on the Port tab; its description when that says something else |
+| `note` | The note typed in the sheet, up to 200 characters |
+| `vlan`, `voice` | PVID; voice VLAN ID |
+| `mgmt` | Management address (the first IPv4 one) |
+| `model` | Manufacturer and model from LLDP-MED inventory, or the CDP platform |
+| `poe` | PoE watts the switch allocated |
+| `loc` | LLDP-MED location as one line |
+| `via` | `LLDP` or `CDP` |
+| `link` | Speed and duplex, e.g. `100M FD` |
+| `mac` | This tester's MAC on the port |
+| `ip`, `gw` | This tester's DHCP address with prefix length, and gateway |
+| `dhcp` | One per DHCP server that answered |
+| `probe` | This tester's probe number |
+| `stp`, `root` | Spanning tree protocol, role and state; root bridge priority and MAC |
+| `lag` | LAG membership from LLDP, and LACP state and key |
+| `dot1x` | `auth requested` and the EAP method, when the port asked for 802.1X |
+| `igmp`, `pim` | IGMP querier and version (and its VLAN when tagged); PIM router |
+| `ptp` | One per PTP version heard: subdomain or domain, master, grandmaster |
+| `t` | When the link was made, Unix seconds |
+| `vl`, `vlmore` | One per VLAN the switch listed (ID, a space, its name), as many as keep the whole link under 1800 characters; `vlmore` counts the rest |
 
 Example for a form that prefills from its query string:
 `https://forms.example.net/noc/?requestType=Switch&switchIp={switch_ip}&port={port}`.

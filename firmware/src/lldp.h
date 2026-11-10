@@ -41,6 +41,7 @@ extern "C" {
 #define LLDP_MAX_PPVIDS         4    /* 802.1 port and protocol VLAN IDs     */
 #define LLDP_MAX_PROTOCOLS      47   /* 802.1 protocol identity names, ", "-joined */
 #define LLDP_MAX_LOCATION       95   /* LLDP-MED location, formatted         */
+#define LLDP_MAX_CIVIC          160  /* civic address: country + elements, raw */
 #define LLDP_MAX_MUD_URL        95   /* IANA MUD URL (RFC 8520)              */
 
 /* Size of a buffer that can hold any output of lldp_format_id(). */
@@ -212,6 +213,7 @@ enum { LLDP_LOC_NONE = 0, LLDP_LOC_COORD = 1, LLDP_LOC_CIVIC = 2, LLDP_LOC_ELIN 
 typedef struct {
     uint8_t  app_type;               /* LLDP_MED_APP_*                      */
     bool     unknown_policy;         /* U flag                              */
+    bool     no_qos;                 /* from CDP: VLAN only, no priority or DSCP sent */
     bool     tagged;                 /* T flag                              */
     uint16_t vlan_id;
     uint8_t  l2_priority;
@@ -321,6 +323,8 @@ typedef struct {
     lldp_med_power_t  med_power;
     uint8_t  location_format;        /* LLDP_LOC_*                          */
     char     location[LLDP_MAX_LOCATION + 1];
+    uint8_t  civic[LLDP_MAX_CIVIC];  /* civic only: country(2), then CAtype/len/value elements as sent */
+    uint8_t  civic_len;
 
     /* CDP only */
     uint8_t  cdp_version;

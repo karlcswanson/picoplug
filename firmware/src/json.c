@@ -399,6 +399,12 @@ static void write_igmp(jw_t *w, const igmp_state_t *g, uint32_t now_ms)
         if (g->querier_changes) { jw_kv_uint(w, "querier_changes", g->querier_changes); jw_kv_ip(w, "prev_querier", g->prev_querier_ip); }
         if (g->version == 3) { jw_kv_uint(w, "qrv", g->qrv); jw_kv_bool(w, "s_flag", g->s_flag); }
         if (g->interval_ms) jw_kv_uint(w, "interval_s", (g->interval_ms + 500) / 1000u);
+        if (g->vlan) jw_kv_uint(w, "vlan", g->vlan);
+        if (g->n_other_vlans) {
+            jw_key(w, "other_vlans"); jw_arr_begin(w);
+            for (int i = 0; i < g->n_other_vlans; i++) jw_uint(w, g->other_vlans[i]);
+            jw_arr_end(w);
+        }
         if (g->qqi_s) jw_kv_uint(w, "qqi_s", g->qqi_s);
         jw_kv_uint(w, "max_resp_ds", g->max_resp_ds);
         jw_kv_uint(w, "first_s", (now_ms - g->first_ms) / 1000u);
@@ -638,14 +644,17 @@ static void write_neighbor_vlans(jw_t *w, const lldp_neighbor_t *n)
         jw_arr_end(w);
     }
 
+    /* a policy with the U flag set says "no policy defined" (Cisco sends one when the port has
+       no voice VLAN), so its VLAN 0 is not a voice VLAN */
     const lldp_med_policy_t *voice = lldp_find_med_policy(n, LLDP_MED_APP_VOICE);
-    if (voice) {
+    if (voice && !voice->unknown_policy) {
         jw_key(w, "voice_vlan"); jw_obj_begin(w);
         jw_kv_uint(w, "id", voice->vlan_id);
         jw_kv_bool(w, "tagged", voice->tagged);
-        jw_kv_uint(w, "priority", voice->l2_priority);
-        jw_kv_uint(w, "dscp", voice->dscp);
-        if (voice->unknown_policy) jw_kv_bool(w, "unknown_policy", true);
+        if (!voice->no_qos) {
+            jw_kv_uint(w, "priority", voice->l2_priority);
+            jw_kv_uint(w, "dscp", voice->dscp);
+        }
         jw_obj_end(w);
     }
     if (n->n_med_policies) {
@@ -656,8 +665,11 @@ static void write_neighbor_vlans(jw_t *w, const lldp_neighbor_t *n)
             jw_kv_str(w, "app", lldp_med_app_name(p->app_type));
             jw_kv_uint(w, "id", p->vlan_id);
             jw_kv_bool(w, "tagged", p->tagged);
-            jw_kv_uint(w, "priority", p->l2_priority);
-            jw_kv_uint(w, "dscp", p->dscp);
+            if (!p->no_qos) {
+                jw_kv_uint(w, "priority", p->l2_priority);
+                jw_kv_uint(w, "dscp", p->dscp);
+            }
+            if (p->unknown_policy) jw_kv_bool(w, "unknown_policy", true);
             jw_obj_end(w);
         }
         jw_arr_end(w);
@@ -770,6 +782,20 @@ static void write_neighbor_phy(jw_t *w, const lldp_neighbor_t *n)
         jw_kv_str(w, "format", n->location_format == LLDP_LOC_COORD ? "coordinates" :
                                n->location_format == LLDP_LOC_CIVIC ? "civic" : "elin");
         jw_kv_str(w, "text", n->location);
+        if (n->location_format == LLDP_LOC_CIVIC && n->civic_len >= 2) {
+            /* every address element as sent (RFC 4776 CAtypes 1-39; language, script and private ones left out) */
+            if (n->civic[0] > ' ' && n->civic[1] > ' ') { jw_key(w, "country"); jw_strn(w, (const char *)n->civic, 2); }
+            jw_key(w, "civic"); jw_arr_begin(w);
+            for (size_t p = 2; p + 2 <= n->civic_len; p += 2 + (size_t)n->civic[p + 1]) {
+                uint8_t t = n->civic[p], len = n->civic[p + 1];
+                if (t < 1 || t > 39 || !len) continue;
+                jw_obj_begin(w);
+                jw_kv_uint(w, "type", t);
+                jw_key(w, "value"); jw_strn(w, (const char *)&n->civic[p + 2], len);
+                jw_obj_end(w);
+            }
+            jw_arr_end(w);
+        }
         jw_obj_end(w);
     }
     if (n->mud_url[0]) jw_kv_str(w, "mud_url", n->mud_url);

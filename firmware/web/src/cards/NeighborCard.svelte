@@ -8,6 +8,8 @@
   import { ui, sel } from '../lib/ui.svelte.js';
   import More from '../lib/More.svelte';
   import { app, formFill, formVals } from '../lib/app.svelte.js';
+  import ShareSheet from '../lib/ShareSheet.svelte';
+  import { SHARE_PAGE } from '../lib/share.js';
   import { conn } from '../lib/status.svelte.js';
   import { stripKind, portName, isHost, isStale, v4first, hKey, fmtAgo, fmtDur, portFit, summary } from '../lib/format.js';
 
@@ -19,7 +21,12 @@
 
   let open = $derived(detail || !!ui.nb);
   let stale = $derived(!detail && isStale(n));
-  let form = $derived(!detail && !n.picoplug && app.form && !app.readonly ? formFill(app.form, formVals(conn.status, n)) : '');
+  // Share: the link from Setup (the share page by default; on the read-only page, which cannot
+  // read Setup, always the share page), filled from this card
+  let shareOn = $derived(!detail && !n.picoplug);
+  let shareTpl = $derived(!shareOn ? '' : app.readonly ? SHARE_PAGE : app.form);
+  const shareLink = note => shareTpl ? formFill(shareTpl, formVals(conn.status, n, note)) : '';
+  let sheet = $state(false);
   let nm = $derived(n.sys_name || stripKind(n.chassis_id));
   let port = $derived(portName(n));
   let mg = $derived(v4first(n.mgmt_addr));
@@ -42,7 +49,19 @@
   let inv = $derived(n.inventory || {});
   const has = v => v !== undefined && v !== null && v !== '';
   // the heading shows only when at least one row under it does
-  let hasDev = $derived(!!(speed || poe || cpow || n.platform || n.vtp_domain || n.duplex || n.mtu || n.protocols || n.eee || n.location
+  // LLDP-MED civic address: one labelled box per element the switch sent (RFC 4776 CAtypes),
+  // in address order from the inside out; anything unlisted keeps the order it came in
+  const CIVIC = [[33, 'Seat'], [28, 'Room'], [27, 'Floor'], [26, 'Unit'], [23, 'Name'], [25, 'Building'], [21, 'Landmark'],
+    [22, 'Additional'], [29, 'Place type'], [19, 'Number'], [20, 'Number suffix'], [16, 'Street direction'], [38, 'Street prefix'],
+    [34, 'Street'], [6, 'Street group'], [39, 'Street modifier'], [18, 'Street suffix'], [17, 'Trailing direction'],
+    [35, 'Street section'], [36, 'Branch road'], [37, 'Sub-branch road'], [31, 'PO box'], [5, 'Neighborhood'], [4, 'City division'],
+    [3, 'City'], [30, 'Postal community'], [2, 'County'], [1, 'State'], [24, 'Postal code'], [32, 'Additional code']];
+  let civic = $derived(!n.location || !n.location.civic ? null : [
+    ...n.location.civic.map(e => ({ e, i: CIVIC.findIndex(c => c[0] === e.type) }))
+      .sort((a, b) => (a.i < 0 ? 99 : a.i) - (b.i < 0 ? 99 : b.i))
+      .map(({ e, i }) => ({ k: i < 0 ? 'Element ' + e.type : CIVIC[i][1], v: e.value })),
+    ...(n.location.country ? [{ k: 'Country', v: n.location.country }] : [])]);
+  let hasDev = $derived(!!(speed || poe || cpow || n.platform || n.vtp_domain || n.duplex || n.mtu || n.protocols || n.eee || (n.location && !civic)
     || inv.serial || inv.manufacturer || inv.model || inv.hw || inv.fw || inv.sw || inv.asset
     || has(n.mgmt_vid) || (n.ppvids && n.ppvids.length)));
   let extra = $derived([n.vlans ? 'VLANs' : '', poe || cpow ? 'PoE' : '', n.platform ? 'platform' : '',
@@ -109,14 +128,17 @@
       {#if n.platform}<Kv k="Platform">{n.platform}</Kv>{/if}
       {#if n.vtp_domain}<Kv k="VTP domain">{n.vtp_domain}</Kv>{/if}
       {#if n.duplex || n.mtu}<Kv k="Duplex / MTU"><Parts p={[sg(n.duplex), sg(n.mtu, 'MTU')]}/></Kv>{/if}
-      {#if inv.manufacturer || inv.model}<Kv k="Model"><Parts sep=" " p={[sg(inv.manufacturer), sg(inv.model)]}/></Kv>{/if}
-      {#if inv.hw || inv.fw || inv.sw}<Kv k="Revisions"><Parts p={[sg(inv.hw, 'hw'), sg(inv.fw, 'fw'), sg(inv.sw, 'sw')]}/></Kv>{/if}
+      {#if inv.manufacturer || inv.model}<Kv k="Model" wide><Parts sep=" " p={[sg(inv.manufacturer), sg(inv.model)]}/></Kv>{/if}
+      {#if inv.hw || inv.fw || inv.sw}<Kv k="Revisions" wide><Parts p={[sg(inv.hw, 'hw'), sg(inv.fw, 'fw'), sg(inv.sw, 'sw')]}/></Kv>{/if}
       {#if inv.asset}<Kv k="Asset ID">{inv.asset}</Kv>{/if}
       {#if has(n.mgmt_vid)}<Kv k="Mgmt VLAN">{n.mgmt_vid}</Kv>{/if}
       {#if n.ppvids && n.ppvids.length}<Kv k="Protocol VLANs">{n.ppvids.map(p => p.id).join(' ')}</Kv>{/if}
       {#if n.protocols}<Kv k="Protocols">{n.protocols}</Kv>{/if}
       {#if n.eee}<Kv k="EEE"><Parts p={[sg(n.eee.tx_us + ' µs', 'tx'), sg(n.eee.rx_us + ' µs', 'rx')]}/></Kv>{/if}
-      {#if n.location}<Kv k="Location" wide copy={n.location.text}>{n.location.text}</Kv>{/if}
+      {#if civic}
+        <div class="grp"><Icon name="pin" size="s"/>Location</div>
+        {#each civic as c}<Kv k={c.k}>{c.v}</Kv>{/each}
+      {:else if n.location}<Kv k="Location" wide copy={n.location.text}>{n.location.text}</Kv>{/if}
 
       <div class="grp"><Icon name="switch" size="s"/>Chassis</div>
       {#if n.caps && n.caps.length}<Kv k="Caps" wide>{n.caps.join(', ')}</Kv>{/if}
@@ -131,8 +153,9 @@
   <div class="foot">
     <span>{footText}</span>
     <span class="crow">
-      {#if form}<a class="btn q" href={form} target="_blank" rel="noopener"><Icon name="form"/>Form</a>{/if}
+      {#if shareOn}<button class="q share" onclick={() => sheet = true}><Icon name="share"/>Share</button>{/if}
       <button class="q" onclick={() => copyText(summary(n))}><Icon name="copy"/>Copy</button>
     </span>
   </div>
+  {#if sheet}<ShareSheet link={shareLink} text={summary(n)} title={port + ' on ' + (n.sys_name || stripKind(n.chassis_id))} onclose={() => sheet = false}/>{/if}
 </div>

@@ -12,6 +12,7 @@
 #include "eth_net.h"
 #include "probe.h"
 #include "neighbor_table.h"
+#include "api_server.h"
 #include "index_html.h"     /* generated from web/dist/index.html */
 #include "icon_png.h"       /* generated from src/web/icon.png */
 #include "manifest_json.h"  /* generated from src/web/manifest.json */
@@ -155,8 +156,36 @@ static void respond(conn_t *c, const char *status, const char *ctype,
     pump(c);
 }
 
+/* "GET /ws" or "GET /ws?..." */
+static bool is_ws_path(const char *req)
+{
+    return strncmp(req, "GET /ws", 7) == 0 && (req[7] == ' ' || req[7] == '?');
+}
+
+/* GET /ws with an Upgrade: websocket header: hand the connection to the status stream
+ * (api_server.c), which pushes every status as a text frame. Read-only, so both sides get it. */
+static void ws_upgrade(conn_t *c)
+{
+    size_t ul = 0, kl = 0;
+    const char *up = find_header(c->req, "Upgrade", &ul);
+    const char *key = find_header(c->req, "Sec-WebSocket-Key", &kl);
+    if (!up || ul != 9 || strncasecmp(up, "websocket", 9) != 0 || !key || kl == 0 || kl > 64) {
+        static const char b[] = "websocket upgrade expected\n";
+        respond(c, "400 Bad Request", "text/plain", b, sizeof b - 1, false);
+        return;
+    }
+    struct tcp_pcb *pcb = c->pcb;
+    if (!api_server_ws_upgrade(pcb, key, kl)) {
+        static const char b[] = "too many websocket clients\n";
+        respond(c, "503 Service Unavailable", "text/plain", b, sizeof b - 1, false);
+        return;
+    }
+    c->pcb = NULL;                  /* api_server owns it now; this slot is free */
+}
+
 static void handle_request(conn_t *c)
 {
+    if (is_ws_path(c->req)) { ws_upgrade(c); return; }
     /* "GET <path> HTTP/1.x" */
     char *path = NULL;
     const char *query = "";
@@ -349,8 +378,10 @@ static err_t on_recv(void *arg, struct tcp_pcb *pcb, struct pbuf *p, err_t err)
         bool have_line = strchr(c->req, '\n') != NULL;
         const char *hend = strstr(c->req, "\r\n\r\n");
         bool have_all = hend != NULL || c->req_len >= REQ_MAX - 1;
-        /* A POST needs its body; everything else can be answered from the request line alone. */
+        /* A POST needs its body, a WebSocket upgrade its headers; everything else can be
+         * answered from the request line alone. */
         bool is_post = strncmp(c->req, "POST ", 5) == 0;
+        if (is_ws_path(c->req) && !hend && c->req_len < REQ_MAX - 1) have_line = false;
         if (is_post && hend) {
             size_t clen = 0, hl;
             const char *cl = find_header(c->req, "Content-Length", &hl);

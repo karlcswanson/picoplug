@@ -81,6 +81,7 @@ add_executable(picolldp
     src/json.c
     src/status.c
     src/api_server.c
+    src/ws.c
     src/http_server.c
     src/lldp.c
     src/cdp.c

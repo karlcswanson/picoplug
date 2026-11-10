@@ -278,6 +278,7 @@ def main():
         text = cdp.js("document.body.innerText")
         check("igmp querier" in text.lower() and "192.168.109.1" in text and "every 125 s" in text, "IGMP querier row")
         check("· the gateway" in text and "IGMPv3" in text and "robustness 2" in text and "answer within 10 s" in text, "IGMP querier identified and v3 details shown")
+        check("also queries in VLAN 620" in text and "tagged VLAN" not in text, "queries from another VLAN are listed, not merged into the querier")
         check("3 reports from others" in text and "probably" not in text, "stray reports counted, no snooping guess")
         check("multicast router" in text.lower() and "PIM hello" in text and "DR priority 1" in text and "hold 105 s" in text, "multicast router row")
         got = tap('Multicast router')
@@ -332,26 +333,43 @@ def main():
             check(sw <= 375, f"case {i}: no horizontal overflow at 375 px (scrollWidth {sw})")
         cdp.call("Emulation.clearDeviceMetricsOverride")
 
-        # --- form link: a button on the Port tab with the neighbor filled into the Setup template
-        formbtn = "([...document.querySelectorAll('.card.nb a.btn')].find(a=>a.textContent.trim()==='Form')||{})"
+        # --- Share: a button on the Port tab opens a sheet; its link is the Setup template filled from the card
+        sharebtn = "document.querySelector('.card.nb button.share')"
+        def sheet():
+            """open the Share sheet, return its link, target and items, close it"""
+            cdp.js(sharebtn + ".click()"); time.sleep(0.4)
+            r = cdp.js("""(()=>{const d=document.querySelector('dialog.sheet[open]');if(!d)return null;const a=d.querySelector('a.btn');
+              return {href:a?a.href:null,target:a?a.target:null,items:[...d.querySelectorAll('.slist > *')].map(e=>e.textContent.trim())}})()""")
+            cdp.js("(()=>{const d=document.querySelector('dialog.sheet[open]');if(d)d.close();return 1})()"); time.sleep(0.3)
+            return r or {}
         load(0)
-        href = cdp.js(formbtn + ".href||''")
-        check(href.startswith("https://mdn.github.io/dom-examples/url-params/?switch=") and "&port=mgi6&vlan=1" in href, "form button fills the default link: " + href)
-        check(cdp.js(formbtn + ".target") == "_blank", "form button opens a new tab")
+        sh = sheet()
+        href = sh.get("href") or ""
+        check(href.startswith("https://clockclub.net/apps/picoplug/#sw="), "Share sheet links to the share page by default: " + href)
+        q = urllib.parse.parse_qs(href.partition("#")[2])
+        check(q.get("port") == ["mgi6"] and q.get("vlan") == ["1"] and q.get("via") == ["LLDP"] and "t" in q, f"share link carries the card as name=value pairs: {q}")
+        check(sh.get("target") == "_blank" and sh.get("items", [])[1:3] == ["Copy link", "Copy as text"], f"sheet: open in a new tab, copy link, copy text: {sh}")
+        check(not cdp.js("!!document.querySelector('dialog.sheet')"), "sheet closes")
+        cdp.js(sharebtn + ".click()"); time.sleep(0.4)
+        cdp.js("(()=>{const i=document.querySelector('dialog.sheet .snote');i.value='under the stage, A12';i.dispatchEvent(new Event('input'));return 1})()"); time.sleep(0.3)
+        href = cdp.js("document.querySelector('dialog.sheet a.btn').href")
+        cdp.js("document.querySelector('dialog.sheet').close();1"); time.sleep(0.3)
+        check(urllib.parse.parse_qs(href.partition("#")[2]).get("note") == ["under the stage, A12"], "the sheet's note rides along in the link: " + href)
         formcard = "[...document.querySelectorAll('.card')].find(c=>c.querySelector('#s_form'))"
         view("setup", 0.8)
         cdp.js("{const f=document.getElementById('s_form');f.value='https://nf.example.net/noc/?requestType=Switch&switchIp={switch_ip}&port={port}';f.dispatchEvent(new Event('input'))}"); time.sleep(0.3)
         check("port=mgi6" in cdp.js(formcard + ".innerText"), "Setup previews the filled-in link")
         cdp.js(formcard + ".querySelector('button.p').click()"); time.sleep(0.8)
         view("port", 2.5)
-        href = cdp.js(formbtn + ".href||''")
-        check(href.startswith("https://nf.example.net/noc/?requestType=Switch&switchIp=") and href.endswith("&port=mgi6"), "saved link drives the button: " + href)
+        href = sheet().get("href") or ""
+        check(href.startswith("https://nf.example.net/noc/?requestType=Switch&switchIp=") and href.endswith("&port=mgi6"), "saved link drives the sheet: " + href)
         view("setup", 0.8)
         cdp.js("{const f=document.getElementById('s_form');f.value='';f.dispatchEvent(new Event('input'))}"); time.sleep(0.3)
         cdp.js(formcard + ".querySelector('button.p').click()"); time.sleep(0.8)
         view("port", 2.5)
-        check(cdp.js(formbtn + ".href") is None, "blank link hides the button")
-        urllib.request.urlopen(base + "/settings?form_url=" + urllib.parse.quote("https://mdn.github.io/dom-examples/url-params/?switch={switch}&switch_ip={switch_ip}&port={port}&vlan={vlan}", safe="")).read()
+        sh = sheet()
+        check(sh.get("href") is None and sh.get("items", [None])[0] == "Copy as text" and "Copy link" not in sh.get("items", []), f"blank link: the sheet only copies: {sh}")
+        urllib.request.urlopen(base + "/settings?form_url=" + urllib.parse.quote("https://clockclub.net/apps/picoplug/#{share}", safe="")).read()
 
         # --- case 9: link up, nothing heard yet
         load(9)
@@ -374,7 +392,7 @@ def main():
         check("Another picoplug" in text, "picoplug neighbor is identified")
         check(cdp.js("!!document.querySelector('.card.nb use[href=\"#i-probes\"]')"), "picoplug neighbor gets the probes icon")
         check(hstat() == "No switch · picoplug-3", "header does not name the picoplug as the switch port")
-        check(cdp.js(formbtn + ".href") is None, "no form button for a picoplug neighbor")
+        check(not cdp.js("!!" + sharebtn), "no Share button for a picoplug neighbor")
         check(not any(e.get("sys_name") == "picoplug-3" for e in json.loads(cdp.js("localStorage.getItem('piccolldp.history.v1')") or "[]")), "picoplug neighbor kept out of the port log")
         view("setup")
         check("no CDP switch" in cdp.js("document.body.innerText"), "Setup says no CDP switch heard")
@@ -387,19 +405,31 @@ def main():
             cdp.js("document.querySelector('.card.nb .disc').click()"); time.sleep(0.3)
         text = cdp.js("document.querySelector('.card.nb').innerText")
         for want in ("Class 6", "4-pair", "Mgmt VLAN", "99", "Protocol VLANs", "300", "RSTP, LACP, 802.1X, 0x1234",
-                     "tx 17 µs", "Floor 2, Room B12", "example.com/mud", "member of aggregate 1001"):
+                     "tx 17 µs", "example.com/mud", "member of aggregate 1001"):
             check(want in text, f"extras: {want!r} shown")
+        check("hw C9200CX-12P-2X2G (ARM64)" in text and "sw 17.15.4" in text, "extras: revisions shown")
+        loc = cdp.js("""(()=>{const g=[...document.querySelectorAll('.card.nb .grp')].find(e=>e.textContent.trim()==='Location');if(!g)return null;
+          const out=[];for(let e=g.nextElementSibling;e&&e.classList.contains('kv');e=e.nextElementSibling)out.push(e.querySelector('.k').textContent.trim()+'='+e.querySelector('.v').textContent.trim());return out})()""")
+        check(loc == ["Room=B12", "Floor=2", "Number=170", "Street=W Tasman Dr", "City=San Jose", "State=CA", "Country=US"], f"extras: civic location as labelled fields, inside out: {loc}")
+        spill = cdp.js("[...document.querySelectorAll('.kv .v')].filter(v=>v.offsetParent&&v.scrollWidth>v.clientWidth+1).map(v=>v.innerText.slice(0,40))")
+        check(not spill, f"extras: every value fits its box at 375 px {spill}")
         sw = cdp.js("document.documentElement.scrollWidth")
         check(sw <= 375, f"extras: no horizontal overflow at 375 px (scrollWidth {sw})")
         cdp.call("Emulation.clearDeviceMetricsOverride")
 
-        # --- keepalive: lost replies show the reconnecting line and dim the page; a reply clears it
+        # --- live: with /status.json blocked, a change still reaches the page, pushed over /ws
         cdp.call("Network.enable")
         cdp.call("Network.setBlockedURLs", urls=["*status.json*"])
+        pin(9); time.sleep(1)
+        check(str(hstat()).startswith("Listening"), "a pushed status updates the page at once: " + str(hstat()))
+
+        # --- keepalive: with the socket gone too, lost replies show the reconnecting line and dim the page; a reply clears it
+        urllib.request.urlopen(base + "/__mock/ws?0").read()
         time.sleep(4)
         check(cdp.js("!!document.querySelector('.conn')") and "Reconnecting" in cdp.js("document.querySelector('.conn').textContent")
               and cdp.js("document.body.classList.contains('offline')"), "reconnecting line while the device does not answer")
         cdp.call("Network.setBlockedURLs", urls=[])
+        urllib.request.urlopen(base + "/__mock/ws?1").read()
         time.sleep(4)
         check(cdp.js("!document.querySelector('.conn')") and not cdp.js("document.body.classList.contains('offline')"), "reconnecting line clears on the next reply")
 

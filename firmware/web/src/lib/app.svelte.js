@@ -2,13 +2,14 @@
 
 import { conn } from './status.svelte.js';
 import { pickCurrent, portName, stripKind, isP } from './format.js';
+import { shareParams } from './share.js';
 import { sel } from './ui.svelte.js';
 import { say } from './copy.svelte.js';
 
 export const VIEWS = ['port', 'tools', 'log', 'setup'];
 export const app = $state({
   view: 'port', readonly: false,
-  form: '', formDef: '',       // the Form link template and its default
+  form: '', formDef: '',       // the Share link template and its default
   host: '', qt: '',            // the Tools target and which quick button picked it
   fallback: '', fbFocus: false, // text to copy by hand when the clipboard refuses
   rebooting: '',               // the address the device comes back on after a reboot
@@ -39,15 +40,16 @@ export function targets() {
 }
 export function pickTarget(k) { const t = targets()[k]; app.qt = k; if (t) app.host = t; }
 
-// form link: the Setup template with {name} fill-ins from the shown neighbor and the lease
-export function formVals(s, cur) {
+// Share link: the Setup template with {name} fill-ins from the shown neighbor and the lease;
+// {share} is all of it as name=value pairs (share.js), already encoded
+export function formVals(s, cur, note) {
   const n = cur || {}, d = (s && s.port && s.port.dhcp) || {};
   return { switch: n.sys_name || stripKind(n.chassis_id) || '', switch_ip: (n.mgmt_addr || []).find(a => !a.includes(':')) || '',
     port: cur ? portName(n) : '', port_desc: n.port_desc || '', vlan: n.pvid !== undefined ? n.pvid : '',
     voice_vlan: n.voice_vlan ? n.voice_vlan.id : '', ip: d.bound ? d.ip : '', gateway: d.bound ? d.gateway || '' : '',
-    probe: s && isP(s.probe) ? s.probe : '' };
+    probe: s && isP(s.probe) ? s.probe : '', share: cur ? shareParams(s, n, note) : '' };
 }
-export const formFill = (t, v) => t.replace(/\{(\w+)\}/g, (m, k) => k in v ? encodeURIComponent(v[k]) : m);
+export const formFill = (t, v) => t.replace(/\{(\w+)\}/g, (m, k) => !(k in v) ? m : k === 'share' ? v[k] : encodeURIComponent(v[k]));
 
 // GET /tool?... and toast the error, if any
 export function tool(q, okMsg) {
@@ -60,7 +62,7 @@ export function tool(q, okMsg) {
     .catch(() => { say('No reply'); });
 }
 
-// the Form setting arrives with /settings, at start and whenever Setup saves
+// the Share link setting arrives with /settings, at start and whenever Setup saves
 export function formSet(j) {
   if (j.form_url === undefined) return;
   app.form = j.form_url; app.formDef = j.defaults ? j.defaults.form_url : '';

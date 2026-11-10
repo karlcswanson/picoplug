@@ -5,12 +5,16 @@ page without hardware.
 
     python3 web_mock.py [--port 8080] [--ndjson FILE] [--index N]
 
-GET /__mock/index?N pins the served line (used by test_page.py).
+GET /__mock/index?N pins the served line (used by test_page.py). /ws is a WebSocket that pushes
+the current line at once when it changes and every 2 s, like the firmware; GET /__mock/ws?0
+closes the sockets and refuses new ones (?1 allows them again), so the page falls back to polling.
 FILE is NDJSON (one status object per line), e.g. the output of the host
 test binary: `build-test/test_json > status.ndjson`. Without --index the
 server cycles through the lines every 4 s so you can watch transitions.
 """
 import argparse
+import base64
+import hashlib
 import http.server
 import json
 import urllib.parse
@@ -29,10 +33,18 @@ def main():
     ap.add_argument("--index", type=int, default=None)
     a = ap.parse_args()
     a.probe = None
-    a.form_url = "https://mdn.github.io/dom-examples/url-params/?switch={switch}&switch_ip={switch_ip}&port={port}&vlan={vlan}"
+    a.ws = True
+    a.form_url = "https://clockclub.net/apps/picoplug/#{share}"
     with open(a.ndjson) as f:
         lines = [l.strip() for l in f if l.strip()]
     t0 = time.time()
+    current = lambda: a.index if a.index is not None else int((time.time() - t0) // 4) % len(lines)
+
+    def frame(data, opcode=0x1):
+        n = len(data)
+        hdr = bytes([0x80 | opcode, n]) if n < 126 else bytes([0x80 | opcode, 126]) + n.to_bytes(2, "big") if n < 65536 \
+            else bytes([0x80 | opcode, 127]) + n.to_bytes(8, "big")
+        return hdr + data
 
     class H(http.server.BaseHTTPRequestHandler):
         def log_message(self, *x):
@@ -43,9 +55,28 @@ def main():
             if path in ("/", "/index.html"):
                 body = open(PAGE, "rb").read()
                 ctype = "text/html; charset=utf-8"
+            elif path == "/ws" and a.ws and self.headers.get("Sec-WebSocket-Key"):
+                key = self.headers["Sec-WebSocket-Key"] + "258EAFA5-E914-47DA-95CA-C5AB0DC85B11"
+                self.send_response(101)
+                self.send_header("Upgrade", "websocket")
+                self.send_header("Connection", "Upgrade")
+                self.send_header("Sec-WebSocket-Accept", base64.b64encode(hashlib.sha1(key.encode()).digest()).decode())
+                self.end_headers()
+                self.close_connection = True
+                last, sent = None, 0.0
+                try:
+                    while a.ws:
+                        i = current()
+                        if i != last or time.time() - sent > 2:
+                            self.wfile.write(frame(lines[i].encode())); self.wfile.flush()
+                            last, sent = i, time.time()
+                        time.sleep(0.05)
+                    self.wfile.write(frame(b"", 0x8)); self.wfile.flush()
+                except OSError:
+                    pass
+                return
             elif path == "/status.json":
-                i = a.index if a.index is not None else int((time.time() - t0) // 4) % len(lines)
-                body = lines[i].encode()
+                body = lines[current()].encode()
                 ctype = "application/json"
             elif path in ("/icon.png", "/apple-touch-icon.png", "/favicon.ico"):
                 body = open(os.path.join(WEB, "icon.png"), "rb").read()
@@ -64,7 +95,11 @@ def main():
                                    "ping_target": "1.1.1.1", "dns_name": "clockclub.net", "dns_server": "", "usb_ip": "192.168.7.1",
                                    "running_ip": "192.168.7.1", "reboot_needed": False,
                                    "defaults": {"ping_target": "1.1.1.1", "dns_name": "clockclub.net", "dns_server": "", "usb_ip": "192.168.7.1",
-                                                "form_url": "https://mdn.github.io/dom-examples/url-params/?switch={switch}&switch_ip={switch_ip}&port={port}&vlan={vlan}"}}).encode() + b"\n"
+                                                "form_url": "https://clockclub.net/apps/picoplug/#{share}"}}).encode() + b"\n"
+                ctype = "application/json"
+            elif path == "/__mock/ws":
+                a.ws = query != "0"
+                body = b'{"ok":true}\n'
                 ctype = "application/json"
             elif path == "/__mock/index":
                 # test hook: GET /__mock/index?N pins /status.json to line N

@@ -27,6 +27,7 @@ typedef struct {
     uint16_t qqi_s;              /* v3 querier's query interval, 0 if absent   */
     uint8_t  qrv;                /* v3 querier's robustness variable           */
     bool     s_flag;             /* v3 suppress router-side processing         */
+    uint16_t vlan;               /* 802.1Q VLAN ID of the frame, 0 = untagged  */
 } igmp_msg_t;
 
 /* PIM Hello (IP protocol 103 to 224.0.0.13): a multicast router on the VLAN. */
@@ -42,6 +43,8 @@ bool pim_parse(const uint8_t *frame, size_t len, pim_msg_t *out);
 
 /* IPv4 protocol 2 (router-alert option tolerated), plain or behind one 802.1Q tag. */
 bool igmp_parse(const uint8_t *frame, size_t len, igmp_msg_t *out);
+
+#define IGMP_OTHER_VLANS_MAX 16
 
 typedef struct {
     bool     seen;               /* a general query since reset                */
@@ -66,6 +69,12 @@ typedef struct {
     uint32_t pim_last_ms;
     uint32_t first_ms, last_ms;
     uint32_t interval_ms;        /* between the last two general queries       */
+    /* A trunk or a voice VLAN brings one querier per VLAN. The querier above is the one in
+     * `vlan` (0 = untagged, which wins once heard); queries tagged with any other VLAN only
+     * list that VLAN here. */
+    uint16_t vlan;
+    uint16_t other_vlans[IGMP_OTHER_VLANS_MAX];
+    uint8_t  n_other_vlans;
     uint32_t generation;
 } igmp_state_t;
 
