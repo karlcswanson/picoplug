@@ -22,10 +22,10 @@
   import { toast } from './lib/copy.svelte.js';
   import { app, route, go, formSet } from './lib/app.svelte.js';
   import { historyUpsert, runAdd, toolSum } from './lib/history.svelte.js';
-  import { pickCurrent, portName, isP, hKey } from './lib/format.js';
+  import { pickCurrent, orderNeighbors, portName, isP, hKey } from './lib/format.js';
 
   let s = $derived(conn.status);
-  let neighbors = $derived((s && s.neighbors) || []);
+  let neighbors = $derived(orderNeighbors(s && s.neighbors));
   let cur = $derived(pickCurrent(neighbors, sel.key));
   let up = $derived((s && s.stp || {}).link_up_for_s || 0);
   let offline = $derived(!!conn.lastOk && conn.fails > 0);

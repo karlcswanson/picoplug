@@ -208,6 +208,7 @@ add_test(NAME captures COMMAND python3 ${CMAKE_CURRENT_SOURCE_DIR}/test_captures
 find_program(NODE node)
 if(NODE)
     add_test(NAME share COMMAND ${NODE} ${CMAKE_CURRENT_SOURCE_DIR}/test_share.mjs)
+    add_test(NAME neighbors COMMAND ${NODE} ${CMAKE_CURRENT_SOURCE_DIR}/test_neighbors.mjs)
 endif()
 add_test(NAME med_policy COMMAND python3 ${CMAKE_CURRENT_SOURCE_DIR}/test_med_policy.py $<TARGET_FILE:frame_json>)
 set_tests_properties(captures PROPERTIES SKIP_RETURN_CODE 77)
