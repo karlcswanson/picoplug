@@ -68,7 +68,7 @@
 
 /* ---- Ethernet-side identity ------------------------------------------ */
 /* MAC used for the W5500 (source of any frames we transmit). Locally
- * administered; the low 3 bytes are replaced by the RP2 unique ID. */
+ * administered; the low 3 bytes are a hash of the flash unique ID (mac_id.h). */
 #define ETH_MAC_PREFIX          { 0x02, 0x50, 0x4C }
 
 /* ---- USB network ----------------------------------------------------- */

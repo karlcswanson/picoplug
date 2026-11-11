@@ -91,6 +91,7 @@ add_executable(picolldp
     src/stp.c
     src/dhcp_info.c
     src/settings.c
+    src/mac_id.c
     src/query.c
     src/settings_store.c
     src/tool.c
