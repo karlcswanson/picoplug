@@ -31,6 +31,7 @@
 #include "hardware/structs/watchdog.h"
 #include "pico/stdlib.h"
 #include "pico/unique_id.h"
+#include "mac_id.h"
 
 #include <stdio.h>
 #include <string.h>
@@ -200,10 +201,13 @@ int main(void)
     sleep_ms(100);
     printf("\npicoplug fw %s (%s)\n", FW_VERSION, PICO_BOARD);
 
-    /* Derive locally administered MACs from the flash unique ID. */
+    /* Derive the MACs from the flash unique ID. Ethernet: a hash of all of it (mac_id.h), so
+     * boards from different lots never share an address by sharing their last bytes. USB: the
+     * last 3 bytes as before; that link only reaches the phone, and a new address there makes
+     * the computer see a new adapter. */
     pico_unique_board_id_t uid;
     pico_get_unique_board_id(&uid);
-    memcpy(eth_mac + 3, uid.id + PICO_UNIQUE_BOARD_ID_SIZE_BYTES - 3, 3);
+    mac_id_suffix(uid.id, PICO_UNIQUE_BOARD_ID_SIZE_BYTES, eth_mac + 3);
     memcpy(usb_host_mac + 3, uid.id + PICO_UNIQUE_BOARD_ID_SIZE_BYTES - 3, 3);
     memcpy(usb_dev_mac + 3, uid.id + PICO_UNIQUE_BOARD_ID_SIZE_BYTES - 3, 3);
 

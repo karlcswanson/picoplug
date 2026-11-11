@@ -22,10 +22,19 @@ export const portFit = p => p && p.length > 12 ? `min(36px,calc((100cqw - 32px) 
 
 export const isP = n => typeof n === 'number' && n >= 0 && n <= 9;
 
+// The neighbor tabs: LLDP first, then CDP, other picoplug testers last; otherwise in the order
+// first heard. The order never depends on timing, so the tabs do not swap places.
+export function orderNeighbors(ns) {
+  const rank = n => (n.picoplug ? 2 : 0) + ((n.proto || 'lldp') === 'lldp' ? 0 : 1);
+  return (ns || []).map((n, i) => [n, i]).sort(([a, i], [b, j]) => rank(a) - rank(b) || i - j).map(x => x[0]);
+}
+
+// The neighbor shown: the one picked, else the first tab, unless that one has gone stale and
+// another switch neighbor is still current (a switch that stopped sending LLDP but still sends CDP).
 export function pickCurrent(ns, selKey) {
   if (selKey) { const k = ns.find(n => hKey(n) === selKey); if (k) return k; }
-  return ns.slice().sort((a, b) => (!!a.picoplug - !!b.picoplug) || (a.last_seen_s - b.last_seen_s)
-    || ((a.proto || 'lldp') === 'lldp' ? -1 : 1))[0];
+  const o = orderNeighbors(ns);
+  return o.find(n => !n.picoplug && !isStale(n)) || o[0];
 }
 
 export function summary(n) {
