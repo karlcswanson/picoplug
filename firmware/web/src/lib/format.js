@@ -59,3 +59,14 @@ export function summary(n) {
 
 export const RES = ['black', 'brown', 'red', 'orange', 'yellow', 'green', 'blue', 'violet', 'grey', 'white'];
 export const waiting = (up, need) => up < need ? 'listening… ' + up + ' s' : '';
+
+// IEEE 1588 terms for what a grandmaster declares about itself (2008 Tables 5 and 7; 2019 adds serial time code and renames GPS to GNSS).
+// Unlisted clock classes stay a bare number.
+const PTP_CLASS = { 6: 'primary reference', 7: 'holdover', 13: 'application-specific source',
+  14: 'holdover, application-specific', 52: 'degraded, alternative A', 58: 'degraded, alternative A, application-specific',
+  187: 'degraded, alternative B', 193: 'degraded, alternative B, application-specific', 248: 'default', 255: 'slave-only' };
+export const ptpClass = c => 'class ' + c + (PTP_CLASS[c] ? ' · ' + PTP_CLASS[c] : '');
+const PTP_SOURCE = { atomic: 'atomic clock', gps: 'GNSS', terrestrial_radio: 'terrestrial radio',
+  serial_time_code: 'serial time code', ptp: 'PTP', ntp: 'NTP', handset: 'hand set', other: 'other',
+  oscillator: 'internal oscillator' };
+export const ptpSource = s => PTP_SOURCE[s] || (s && s !== 'unknown' ? s : '');
