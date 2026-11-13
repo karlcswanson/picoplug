@@ -22,6 +22,7 @@ static int test_roundtrip(void)
     CHECK(s.lldp_on && s.cdp_on); CHECK_STR(s.usb_ip, "192.168.7.1"); CHECK(s.probe == SETTINGS_PROBE_NONE);
     CHECK_STR(s.form_url, SETTINGS_DEFAULT_FORM_URL);
     strcpy(s.dns_server, "9.9.9.9"); s.cdp_on = false; strcpy(s.usb_ip, "10.42.0.1"); s.probe = 3; strcpy(s.form_url, "https://example.com/f?sw={switch_ip}&p={port}");
+    s.has_mac = true; s.eth_mac[0] = 0x12; s.eth_mac[1] = 0x34; s.eth_mac[2] = 0x56;
     uint8_t buf[SETTINGS_BLOB_MAX];
     size_t n = settings_encode(&s, buf, sizeof buf);
     CHECK(n > 12 && n <= SETTINGS_BLOB_MAX);
@@ -50,7 +51,7 @@ static int test_roundtrip(void)
     /* a version-1 blob (no usb_ip) still decodes, with the default address */
     {
         uint8_t v1[SETTINGS_BLOB_MAX]; size_t m = settings_encode(&s, v1, sizeof v1);
-        size_t plen = (size_t)(v1[6] << 8 | v1[7]) - 17 - (SETTINGS_FORM_URL_MAX + 1);   /* drop usb_ip, probe, form_url */
+        size_t plen = (size_t)(v1[6] << 8 | v1[7]) - 17 - (SETTINGS_FORM_URL_MAX + 1) - 4;   /* drop usb_ip, probe, form_url, mac */
         v1[5] = 1; v1[6] = (uint8_t)(plen >> 8); v1[7] = (uint8_t)plen;
         /* recompute the CRC the way settings.c does (copy of its table-less loop) */
         uint32_t c = 0xFFFFFFFFu;
@@ -59,14 +60,22 @@ static int test_roundtrip(void)
         (void)m;
         CHECK(settings_decode(v1, sizeof v1, &d));
         CHECK_STR(d.dns_server, "9.9.9.9"); CHECK(!d.cdp_on); CHECK_STR(d.usb_ip, "192.168.7.1"); CHECK(d.probe == SETTINGS_PROBE_NONE);
-        CHECK_STR(d.form_url, SETTINGS_DEFAULT_FORM_URL);
+        CHECK_STR(d.form_url, SETTINGS_DEFAULT_FORM_URL); CHECK(!d.has_mac);
     }
     /* a version-3 blob (trailing lan_page byte, firmware 0.1.x) still decodes; the byte is ignored */
     {
         uint8_t v2[SETTINGS_BLOB_MAX]; size_t m3 = settings_encode(&s, v2, sizeof v2);
-        size_t plen = (size_t)(v2[6] << 8 | v2[7]) - (SETTINGS_FORM_URL_MAX + 1);   /* v5 length */
+        size_t plen = (size_t)(v2[6] << 8 | v2[7]) - 4;   /* v6 length */
         uint32_t c;
         uint8_t *q;
+        /* version 6: no MAC, so the board picks one */
+        v2[5] = 6; v2[6] = (uint8_t)(plen >> 8); v2[7] = (uint8_t)plen;
+        c = 0xFFFFFFFFu;
+        for (size_t i = 0; i < 8 + plen; i++) { c ^= v2[i]; for (int k = 0; k < 8; k++) c = (c >> 1) ^ (0xEDB88320u & (0u - (c & 1u))); }
+        c = ~c; q = v2 + 8 + plen; q[0] = (uint8_t)(c >> 24); q[1] = (uint8_t)(c >> 16); q[2] = (uint8_t)(c >> 8); q[3] = (uint8_t)c;
+        CHECK(settings_decode(v2, sizeof v2, &d));
+        CHECK(d.probe == 3); CHECK(!d.has_mac); CHECK_STR(d.form_url, "https://example.com/f?sw={switch_ip}&p={port}");
+        plen -= SETTINGS_FORM_URL_MAX + 1;   /* v5 length */
         /* version 5: no form_url */
         v2[5] = 5; v2[6] = (uint8_t)(plen >> 8); v2[7] = (uint8_t)plen;
         c = 0xFFFFFFFFu;
@@ -146,6 +155,7 @@ static int test_query(void)
     CHECK(!settings_apply_query(&s, "probe=10", err, sizeof err, &ch)); CHECK(s.probe == 7);
     CHECK(!settings_apply_query(&s, "probe=x", err, sizeof err, &ch));
     CHECK(settings_apply_query(&s, "reset=1", err, sizeof err, &ch)); CHECK(s.probe == 7);
+    { settings_t m = s; m.has_mac = true; m.eth_mac[2] = 9; CHECK(settings_apply_query(&m, "reset=1", err, sizeof err, &ch)); CHECK(m.has_mac && m.eth_mac[2] == 9); }
     CHECK(settings_apply_query(&s, "probe=0", err, sizeof err, &ch)); CHECK(s.probe == 0);
     CHECK(settings_apply_query(&s, "probe=", err, sizeof err, &ch)); CHECK(ch && s.probe == SETTINGS_PROBE_NONE);
     /* form link */

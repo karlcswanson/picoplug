@@ -17,7 +17,7 @@
   import Tools from './views/Tools.svelte';
   import Log from './views/Log.svelte';
   import Setup from './views/Setup.svelte';
-  import { conn, start } from './lib/status.svelte.js';
+  import { conn, start, remote, scanPeers } from './lib/status.svelte.js';
   import { sel } from './lib/ui.svelte.js';
   import { toast } from './lib/copy.svelte.js';
   import { app, route, go, formSet } from './lib/app.svelte.js';
@@ -31,6 +31,17 @@
   let offline = $derived(!!conn.lastOk && conn.fails > 0);
   let linked = $derived(s && s.eth.link && s.eth.chip_ok !== false);
   let portUp = $derived(s && s.port && (s.port.link ?? s.eth.link));
+  // the Port tab shows this tester, or another one read through it (Other probes · View)
+  let rs = $derived(remote.name ? remote.status : s);
+  let rneighbors = $derived(remote.name ? orderNeighbors(rs && rs.neighbors) : neighbors);
+  let rcur = $derived(remote.name ? pickCurrent(rneighbors, sel.key) : cur);
+  let rup = $derived(remote.name ? (rs && rs.stp || {}).link_up_for_s || 0 : up);
+  let rlinked = $derived(rs && rs.eth.link && rs.eth.chip_ok !== false);
+  let rportUp = $derived(rs && rs.port && (rs.port.link ?? rs.eth.link));
+  let rprobe = $derived(!remote.name ? null : remote.status && remote.status.probe != null ? remote.status.probe
+    : ((s && s.peers && s.peers.list || []).find(p => p.name === remote.name) || {}).probe);
+  let rnote = $derived(!remote.name ? '' : remote.error ? remote.error + (remote.status ? ' · showing the last copy' : '')
+    : !remote.status ? 'reading…' : remote.age > 5000 ? 'read ' + Math.round(remote.age / 1000) + ' s ago' : 'live');
 
   // the header status line and the browser tab title carry the answer on every tab
   $effect(() => {
@@ -62,41 +73,41 @@
   });
   // served from the port side: the device answers 403 to everything but the read-only paths, so only the Port tab is shown
   fetch('/tool').then(r => { if (r.status === 403) { app.readonly = true; route(); } }).catch(() => {});
-  fetch('/settings').then(r => r.ok ? r.json() : null).then(j => { if (j) formSet(j); }).catch(() => {});
+  fetch('/settings').then(r => r.ok ? r.json() : null).then(j => { if (j && !app.readonly) { formSet(j); scanPeers(); } }).catch(() => {});
   route();
   start();
 </script>
 
 <Sprite/>
-<Header {s} {cur} {neighbors} {offline} lastOk={conn.lastOk} fails={conn.fails}/>
+<Header {s} {cur} {neighbors} {offline} lastOk={conn.lastOk} fails={conn.fails} remote={app.view === 'port' && remote.name ? { name: remote.name, probe: rprobe, note: rnote } : null}/>
 <main>
   {#if !s && splash}
     <div class="splash" role="status"><span class="spin"></span><b>picoplug</b><span>Connecting…</span></div>
   {/if}
   {#if app.view === 'port'}
     <section>
-    {#if s}
-      {#if s.eth.chip_ok === false}
+    {#if rs}
+      {#if rs.eth.chip_ok === false}
         <div class="alert">
           <div class="t"><Icon name="fail"/>Ethernet chip not responding</div>
-          <p>VERSIONR {s.eth.version} · {s.eth.init_attempts} tries · replug</p>
+          <p>VERSIONR {rs.eth.version} · {rs.eth.init_attempts} tries · replug</p>
         </div>
-      {:else if !s.eth.link}
-        <NoLink/><LastPort/>
+      {:else if !rs.eth.link}
+        <NoLink/>{#if !remote.name}<LastPort/>{/if}
       {/if}
-      {#if cur}
-        <NeighborCard n={cur} {neighbors}/>
-      {:else if linked}
-        <Listening {up}/>
+      {#if rcur}
+        <NeighborCard n={rcur} neighbors={rneighbors}/>
+      {:else if rlinked}
+        <Listening up={rup}/>
       {/if}
-      {#if linked}
-        {#if s.port && portUp}<PortCard p={s.port} stp={s.stp}/>{/if}
-        <StpCard st={s.stp} {up}/>
-        <LacpCard l={s.lacp} {up}/>
-        <Dot1xCard x={s.dot1x} {up}/>
-        <McastCard {s} {cur} {up}/>
-        <PtpCard pt={s.ptp} {up}/>
-        <PeerCard ps={s.peers} pt={s.path} {cur} {up}/>
+      {#if rlinked}
+        {#if rs.port && rportUp}<PortCard p={rs.port} stp={rs.stp}/>{/if}
+        <StpCard st={rs.stp} up={rup}/>
+        <LacpCard l={rs.lacp} up={rup}/>
+        <Dot1xCard x={rs.dot1x} up={rup}/>
+        <McastCard s={rs} cur={rcur} up={rup}/>
+        <PtpCard pt={rs.ptp} up={rup}/>
+        {#if !remote.name}<PeerCard ps={rs.peers} cur={rcur} up={rup}/>{/if}
       {/if}
     {/if}
       {#if app.readonly}

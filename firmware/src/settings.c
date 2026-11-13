@@ -9,7 +9,7 @@
 #include "query.h"
 
 #define MAGIC   0x50434C53u     /* "PCLS" */
-#define VERSION 6u          /* 1: without usb_ip; 2, 4: without probe; 3: had a trailing lan_page byte (removed 2026-10-25); 5: without form_url */
+#define VERSION 7u          /* 1: without usb_ip; 2, 4: without probe; 3: had a trailing lan_page byte (removed 2026-10-25); 5: without form_url; 6: without eth_mac */
 
 /* blob: magic(4) version(2) len(2) payload crc(4); payload is the struct
  * laid out field by field so the on-flash format does not depend on
@@ -41,7 +41,8 @@ void settings_defaults(settings_t *s)
 #define PAYLOAD_LEN_V2 (PAYLOAD_LEN_V1 + 16)
 #define PAYLOAD_LEN_V3 (PAYLOAD_LEN_V2 + 1)
 #define PAYLOAD_LEN_V5 (PAYLOAD_LEN_V2 + 1)
-#define PAYLOAD_LEN (PAYLOAD_LEN_V5 + SETTINGS_FORM_URL_MAX + 1)
+#define PAYLOAD_LEN_V6 (PAYLOAD_LEN_V5 + SETTINGS_FORM_URL_MAX + 1)
+#define PAYLOAD_LEN (PAYLOAD_LEN_V6 + 4)
 
 size_t settings_encode(const settings_t *s, uint8_t *buf, size_t cap)
 {
@@ -59,6 +60,8 @@ size_t settings_encode(const settings_t *s, uint8_t *buf, size_t cap)
     memcpy(p, s->usb_ip, 16); p += 16;
     *p++ = s->probe;
     memcpy(p, s->form_url, SETTINGS_FORM_URL_MAX + 1); p += SETTINGS_FORM_URL_MAX + 1;
+    *p++ = s->has_mac ? 1 : 0;
+    memcpy(p, s->eth_mac, 3); p += 3;
     uint32_t c = crc32(buf, (size_t)(p - buf));
     *p++ = (uint8_t)(c >> 24); *p++ = (uint8_t)(c >> 16); *p++ = (uint8_t)(c >> 8); *p++ = (uint8_t)c;
     return (size_t)(p - buf);
@@ -80,7 +83,7 @@ bool settings_decode(const uint8_t *buf, size_t len, settings_t *out)
     if (magic != MAGIC) return false;
     unsigned ver = (unsigned)(buf[4] << 8 | buf[5]);
     size_t plen = (size_t)(buf[6] << 8 | buf[7]);
-    if (!((ver == 1 && plen == PAYLOAD_LEN_V1) || (ver == 2 && plen == PAYLOAD_LEN_V2) || (ver == 3 && plen == PAYLOAD_LEN_V3) || (ver == 4 && plen == PAYLOAD_LEN_V2) || (ver == 5 && plen == PAYLOAD_LEN_V5) || (ver == VERSION && plen == PAYLOAD_LEN)) || len < 8 + plen + 4) return false;
+    if (!((ver == 1 && plen == PAYLOAD_LEN_V1) || (ver == 2 && plen == PAYLOAD_LEN_V2) || (ver == 3 && plen == PAYLOAD_LEN_V3) || (ver == 4 && plen == PAYLOAD_LEN_V2) || (ver == 5 && plen == PAYLOAD_LEN_V5) || (ver == 6 && plen == PAYLOAD_LEN_V6) || (ver == VERSION && plen == PAYLOAD_LEN)) || len < 8 + plen + 4) return false;
     const uint8_t *c = buf + 8 + plen;
     uint32_t want = ((uint32_t)c[0] << 24) | ((uint32_t)c[1] << 16) | ((uint32_t)c[2] << 8) | c[3];
     if (crc32(buf, 8 + plen) != want) return false;
@@ -95,13 +98,14 @@ bool settings_decode(const uint8_t *buf, size_t len, settings_t *out)
     s.usb_ip[15] = '\0';
     s.probe = ver >= 5 && *p <= 9 ? *p : SETTINGS_PROBE_NONE;
     if (ver >= 5) p++;
-    if (ver >= 6) { memcpy(s.form_url, p, SETTINGS_FORM_URL_MAX + 1); s.form_url[SETTINGS_FORM_URL_MAX] = '\0'; }
+    if (ver >= 6) { memcpy(s.form_url, p, SETTINGS_FORM_URL_MAX + 1); s.form_url[SETTINGS_FORM_URL_MAX] = '\0'; p += SETTINGS_FORM_URL_MAX + 1; }
     else strncpy(s.form_url, SETTINGS_DEFAULT_FORM_URL, sizeof s.form_url - 1);
     /* the default before the share page existed: a saved copy of it moves to the new default */
     if (strcmp(s.form_url, "https://mdn.github.io/dom-examples/url-params/?switch={switch}&switch_ip={switch_ip}&port={port}&vlan={vlan}") == 0) {
         memset(s.form_url, 0, sizeof s.form_url);
         strncpy(s.form_url, SETTINGS_DEFAULT_FORM_URL, sizeof s.form_url - 1);
     }
+    if (ver >= 7 && p[0] == 1) { s.has_mac = true; memcpy(s.eth_mac, p + 1, 3); }
     s.ping_target[15] = s.dns_server[15] = s.dns_name[SETTINGS_DNS_NAME_MAX] = '\0';
     uint8_t ip[4];
     if (!settings_parse_ip(s.ping_target, ip)) return false;
@@ -200,6 +204,8 @@ bool settings_apply_query(settings_t *s, const char *query, char *err, size_t er
                 settings_defaults(&n);
                 n.probe = keep.probe;
                 memcpy(n.form_url, keep.form_url, sizeof n.form_url);
+                n.has_mac = keep.has_mac;
+                memcpy(n.eth_mac, keep.eth_mac, sizeof n.eth_mac);
             }
         } else {
             snprintf(err, errcap, "unknown field: %s", key); return false;

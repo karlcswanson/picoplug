@@ -5,9 +5,10 @@
   import ProbeBadge from './lib/ProbeBadge.svelte';
   import { portName, isStale, fmtDur } from './lib/format.js';
   import { app } from './lib/app.svelte.js';
+  import { closeRemote } from './lib/status.svelte.js';
   const TABS = [['port', 'port', 'Port'], ['tools', 'ping', 'Tools'], ['log', 'log', 'Log'], ['setup', 'sliders', 'Setup']];
 
-  let { s, cur, neighbors, offline, lastOk, fails } = $props();
+  let { s, cur, neighbors, offline, lastOk, fails, remote = null } = $props();
 
   let up = $derived((s && s.stp || {}).link_up_for_s || 0);
   let dhcp = $derived((s && s.port && s.port.dhcp) || {});
@@ -30,7 +31,7 @@
   });
 </script>
 
-<header>
+<header class:remote class="rb{remote && remote.probe != null ? remote.probe : 'x'}">
   <div class="hbar">
     <div class="brand">
       <span class="logo"><Mark/>picoplug{#if s}<ProbeBadge n={s.probe}/>{/if}</span>
@@ -57,6 +58,13 @@
       <a href="#{v}" class:on={app.view === v} aria-current={app.view === v ? 'page' : undefined}><Icon name={icon}/>{label}</a>
     {/each}
   </nav>
+  {#if remote}
+    <!-- another tester's page is shown below: its name, in its probe color, stays in view -->
+    <div class="rbar" role="status">
+      <ProbeBadge n={remote.probe}/><b>{remote.name}</b><span class="rnote">{remote.note}</span>
+      <button class="q" onclick={closeRemote}>Back</button>
+    </div>
+  {/if}
   {#if offline}
     <div class="conn" role="status">
       <span class="spin"></span>

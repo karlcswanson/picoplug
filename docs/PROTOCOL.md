@@ -36,7 +36,7 @@ the corresponding TLV.
 | `probe` | int | This unit's probe number, 0 to 9 (resistor color code: 0 black, 1 brown, 2 red, 3 orange, 4 yellow, 5 green, 6 blue, 7 violet, 8 grey, 9 white). Omitted when none is set. |
 | `seq` | int | Increments per message sent (per transport). |
 | `uptime_s` | int | Seconds since boot. |
-| `eth.mac` | string | This probe's Ethernet MAC (locally administered, from the flash ID). |
+| `eth.mac` | string | This probe's Ethernet MAC (locally administered; the low 3 bytes are picked at random on the first boot and kept with the settings, because the W55RP20's flash ID is the same on every unit). |
 | `eth.link` | bool | W5500 PHY link. |
 | `eth.speed` | int | 10 or 100. Only when link is up. |
 | `eth.duplex` | string | `"full"` or `"half"`. Only when link is up. |
@@ -86,8 +86,10 @@ What the device learned by acting like a normal host on the switch port.
 | `probe.dns` | object | `name`, `ok`, `addr`, `ms`, `server` (resolver the lookup went to), `custom` (true when that resolver came from settings rather than DHCP). |
 
 The device is also reachable as `http://picoplug.local/` on the USB link
-(mDNS responder). Nothing listens on the Ethernet side; the probe only
-sends DHCP, ARP, ICMP echo, and one DNS query.
+(mDNS responder). On the Ethernet side the probe sends DHCP, ARP, ICMP
+echo and one DNS query; for finding other testers (Peers object) it also
+answers mDNS and keeps an IPv6 link-local address, with its neighbor
+discovery and MLD reports.
 
 ## Tx object
 
@@ -284,59 +286,34 @@ and the DHCP lease survive; transmits are skipped while the PHY is down
 | `active` | bool | Blinking, or waiting for the link to come back after the last cycle. |
 | `remaining_s` | int | Seconds of blinking left; 0 while settling. |
 | `cycles`, `link_ups` | int | Down/up cycles completed and how many of them saw the link come back (a switch that needs longer than 2.5 s to negotiate shows fewer). |
-| `pulse` | bool | Present and true while the PHY is down once for another probe's path test (see Path object), not a user blink. |
 | `generation` | int | Bumps on start, each cycle and stop. |
 
 ## Peers object
 
-Other picolldp probes heard on the port. Every probe with a link
-broadcasts a HELLO every 5 s on EtherType 0x88B5 (IEEE local
-experimental), so probes find each other on a bare cable with no IP, or
-anywhere on a shared VLAN. A peer not heard for 16 s is dropped; the
-list is cleared on link-down. Always present.
+Other picoplug testers on the port's network, found with mDNS. Every
+tester advertises itself on the Ethernet side as `picoplug-N.local`
+(`picoplug.local` without a probe number; a name another device already
+holds gets the last four MAC digits added, e.g. `picoplug-3-34a5`) with
+the DNS-SD service `_picoplug._tcp` on port 80. Its TXT record carries
+`probe=`, and from its switch neighbor (the first LLDP one that is not a
+tester, else CDP) `ch=` chassis ID, `sw=` system name, `port=` port ID and
+`pvid=`, plus `fw=`. It answers on its IPv6 link-local address, so testers
+reach each other with no DHCP, and on its DHCP address when it holds one.
+The USB side stays `picoplug.local`.
+
+Nothing is asked until the page does (`GET /peer?scan=1`); after that the
+search stays open, so announcements from testers that come up later are
+heard too. A tester announces again when its TXT changes (another switch or
+port, a new probe number). Entries not heard for 150 s are dropped, and the
+list is cleared on link-down. mDNS stays inside the VLAN, so testers on
+other VLANs are not listed. Always present.
 
 | Field | Type | Notes |
 |-------|------|-------|
-| `count` | int | Probes in the table (up to 8). |
-| `other_macs` | int | Distinct unicast source MACs heard since link-up that are not probes. 0 on a bare probe-to-probe cable; a switch port nearly always shows some (the switch's own LLDP/STP source, other hosts' broadcasts). |
-| `other_macs_capped` | bool | Present when more than 32 were heard. |
-| `list[]` | array | Up to 4 peers: `mac`, `age_s`, `uptime_s`, `speed`, `full_duplex`, and from the peer's own LLDP neighbor `chassis`, `port`, `pvid` (each omitted when the peer has none), `fw`, `probe` (its probe number, omitted when it has none or runs firmware before 0.3.1), and once it has answered an echo `rtt_ms` / `rtt_min_ms` (layer-2 round trip, ms resolution). `sees_us` is true when the peer's LLDP neighbor is this probe, which happens on a direct cable with advertising on. |
-| `generation` | int | Bumps when a peer appears, leaves, or its switch/port/PVID/speed changes. |
-
-## Path object
-
-The two-probe path test (`GET /tool?path=1[&peer=MAC]`): is the run
-between this probe and a peer a direct cable or a switched path? This
-probe asks the peer to power its PHY down once for 3 s, then watches its
-own link and sends the peer an echo every 200 ms. If this link drops in
-step the run is direct (or passes link state through: a coupler, a
-passive injector, a media converter with link pass-through). If this
-link stays up while the peer goes silent, a switch is in between, and
-the time until the peer answers again is reported (about 30 s means the
-peer's switch port runs full spanning tree rather than an edge /
-portfast port). Link tracking on both probes is frozen during the test,
-as for the blinker. Always present.
-
-| Field | Type | Notes |
-|-------|------|-------|
-| `phase` | string | `idle`, `asking` (request sent, up to 6 tries 300 ms apart), `watching` (peer off, 4.5 s), `recovering` (verdict known, waiting up to 45 s from the ACK for the peer or this link to come back), `done`. |
-| `peer` | string | MAC under test. Omitted when idle. |
-| `verdict` | string | `direct`, `switched`, `switched-peer-lost` (link stayed up but the peer never answered again), `no-answer` (no ACK), `inconclusive` (the peer kept answering). Present from `recovering` on. |
-| `acked` | bool | The peer confirmed the request. |
-| `own_link_dropped`, `own_down_ms` | bool, int | This probe's link went down during the test, and for how long in total. |
-| `peer_went_silent`, `peer_came_back`, `peer_back_ms` | bool, bool, int | No echo reply for 1 s inside the off window; a reply after that; ms from the ACK to that reply. |
-| `elapsed_ms`, `age_s` | int | Test duration so far (or total once done); seconds since it finished. |
-| `generation` | int | Bumps on each phase or field change. |
-
-Frame format, after the Ethernet header: `PCLP`, version 1, type, seq
-(2 bytes), then per type: HELLO (1) uptime_s (4), speed (1), full (1),
-pvid (2), then chassis, port and firmware as length-prefixed strings,
-then the probe number plus one (1; 0 = none, absent before 0.3.1);
-ECHO_REQ (2) / ECHO_REP (3) the sender's ms clock (4); BLINK_REQ (4)
-token (2) and off_ms (2); BLINK_ACK (5) token (2). Big-endian, padded
-to 60 bytes. A probe answers a given token once and refuses another
-request for 10 s after a drop, so a retried request never drops the
-link twice.
+| `name` | string | This tester's own mDNS name on the port. |
+| `count` | int | Testers in the table (up to 8). |
+| `list[]` | array | `name`, and when known `probe`, `chassis`, `sys_name`, `port`, `pvid`, `fw` (from its TXT record), `ip6` (link-local), `ip4` (DHCP). |
+| `generation` | int | Bumps when a tester appears, leaves or changes. |
 
 ## Neighbor object
 
@@ -408,7 +385,8 @@ Strings are ASCII; any byte outside 0x20–0x7E is escaped as `\u00XX`.
 | `GET /tool?ping=HOST[&count=N]`, `GET /tool?trace=HOST`, `GET /tool?stop=1` | Start a ping (N 1..60, default 5, 0 = continuous until `stop=1` or 15 minutes) or a traceroute to an IPv4 literal or DNS name, or stop the running one. Same reply shape; status 400 and `error` when it cannot start (`the port has no address yet (DHCP checking)`, `a tool is already running; stop it first`, bad host or count). Results arrive in the `tool` object of `/status.json`. |
 | `GET /tool?dhcp=1` | Drop the Ethernet-side lease and start DHCP again from DISCOVER, then rerun the port checks (the page's Retry DHCP). No-op without a link. |
 | `GET /tool?relisten=1` | Clear the neighbor table so the page waits for the next LLDP/CDP advertisement (the page's Clear and listen again). |
-| `GET /tool?path=1[&peer=MAC]` | Start the two-probe path test against `peer`, or against the only probe heard when `peer` is omitted. 400 with `No other probe heard on this port`, `Several probes heard; pick one`, `That probe is not in the peer list`, `No Ethernet link`, `The port blinker is running` or `A path test is already running`. Progress in the `path` object. The blinker refuses to start while a path test runs. |
+| `GET /peer?scan=1` | Ask the port's network for other testers: one mDNS query for `_picoplug._tcp.local`, at most every 10 s. Answers fill the `peers` object. The page sends this when it opens and every 60 s while it is in view. |
+| `GET /peer?name=NAME` | Another tester's `/status.json`, fetched from it over HTTP (its IPv6 link-local address, or its DHCP address when it has no AAAA record) and refreshed on every call. 200 with the copy and an `X-Age-Ms` header saying how old it is; 202 `{"ok":false,"pending":true}` while the first copy is on its way; 404 for a name not in `peers`; 502 with `error` (`no answer`, `its status did not fit`, ...) when it could not be read. |
 | `GET /tool?blink=1`, `GET /tool?blink=0` | Start the port blinker (32 s, stops itself) or stop it early. Independent of ping/trace; a ping running during a blink just loses probes. Progress in the `blink` object. 400 `Ethernet chip not ready` when the W5500 is absent. |
 | `GET /settings` | Current settings and the defaults: `{"ok":true,"error":"","saved":false,"ping_target":"1.1.1.1","dns_name":"clockclub.net","dns_server":"","lldp":true,"cdp":true,"probe":null,"usb_ip":"192.168.7.1","form_url":"https://...","defaults":{...}}`. |
 | `GET /settings?ping_target=A.B.C.D&dns_name=NAME&dns_server=A.B.C.D&usb_ip=A.B.C.D` | Validate, save to flash and rerun the port probe. Any subset of keys; values URL-encoded; `dns_server=` (empty) means use the DHCP-supplied resolver; `usb_ip` is the device's own address on the USB link (/24, the phone gets the next host address; applies at the next boot, the reply carries `running_ip` and `reboot_needed`); `lldp=`/`cdp=` turn advertising on or off now and at boot (the Settings card's two checkboxes); `probe=0`..`9` sets the probe number (`probe=` clears it), which changes the advertised LLDP system name / CDP device ID from `picoplug` to `picoplug-N` and sends a fresh burst; `form_url=` sets the Share link template (an `http://` or `https://` link up to 255 characters, no spaces, quotes or backslashes; empty = no link; default is the picoplug share page, see Share link); `reset=1` restores defaults but keeps the probe number and the Share link. Replies with the same object; on a bad value nothing is saved, status 400 and `error` names the field. The flash write holds interrupts for about 50 ms. |

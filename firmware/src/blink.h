@@ -26,14 +26,11 @@ typedef struct {
     uint32_t started_ms;
     uint32_t cycles;             /* down/up cycles completed                */
     uint32_t link_ups;           /* cycles in which the link came back      */
-    bool     pulse;              /* one link drop for a peer's path test    */
     uint32_t generation;         /* bumps on start, each cycle, and stop    */
 } blink_state_t;
 
 /* Returns false with err filled when the Ethernet chip is not ready. */
 bool blink_start(char *err, size_t errcap);
-/* One link drop of off_ms (clamped 500..5000), for a peer probe's path test (path.c). */
-bool blink_pulse(uint32_t off_ms);
 void blink_stop(void);
 void blink_poll(void);
 bool blink_active(void);

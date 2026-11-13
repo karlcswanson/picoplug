@@ -22,7 +22,7 @@
 #include "settings.h"
 #include "tool.h"
 #include "blink.h"
-#include "path.h"
+#include "remote.h"
 #include "stp.h"
 
 #include "tusb.h"
@@ -30,6 +30,7 @@
 #include "hardware/watchdog.h"
 #include "hardware/structs/watchdog.h"
 #include "pico/stdlib.h"
+#include "pico/rand.h"
 #include "pico/unique_id.h"
 #include "mac_id.h"
 
@@ -121,7 +122,6 @@ static void got_neighbor(const lldp_neighbor_t *n)
 void app_handle_frame(const uint8_t *frame, size_t len)
 {
     static lldp_neighbor_t n; /* static: ~1.3 KB, keep off the stack */
-    if (path_handle_frame(frame, len)) return;   /* probe-to-probe frames; also counts source MACs */
     if (stp_is_bpdu(frame, len)) {
         keep_frame(2, frame, len);
         stp_bpdu_t b;
@@ -207,7 +207,19 @@ int main(void)
      * the computer see a new adapter. */
     pico_unique_board_id_t uid;
     pico_get_unique_board_id(&uid);
-    mac_id_suffix(uid.id, PICO_UNIQUE_BOARD_ID_SIZE_BYTES, eth_mac + 3);
+    /* That ID turned out to be the same on two W55RP20 boards, so two testers on one switch
+     * shared a MAC and could not see each other. The Ethernet MAC is now random, picked on the
+     * first boot and kept with the settings. */
+    settings_init();                        /* usb_net and dhcpd read the device address */
+    if (!settings_get()->has_mac) {
+        settings_t s = *settings_get();
+        uint32_t r = get_rand_32();
+        mac_id_suffix(uid.id, PICO_UNIQUE_BOARD_ID_SIZE_BYTES, s.eth_mac);
+        s.eth_mac[0] ^= (uint8_t)r; s.eth_mac[1] ^= (uint8_t)(r >> 8); s.eth_mac[2] ^= (uint8_t)(r >> 16);
+        s.has_mac = true;
+        if (!settings_save(&s)) printf("main: could not keep the new MAC\n");
+    }
+    memcpy(eth_mac + 3, settings_get()->eth_mac, 3);
     memcpy(usb_host_mac + 3, uid.id + PICO_UNIQUE_BOARD_ID_SIZE_BYTES - 3, 3);
     memcpy(usb_dev_mac + 3, uid.id + PICO_UNIQUE_BOARD_ID_SIZE_BYTES - 3, 3);
 
@@ -240,11 +252,10 @@ int main(void)
     /* USB side. Order is deliberate: lwIP and every service that must be
      * ready when the host's first DHCP DISCOVER arrives are started BEFORE
      * the USB device is enabled (see usb_net.h). */
-    settings_init();                        /* usb_net and dhcpd read the device address */
     usb_net_init(usb_host_mac, usb_dev_mac);
     eth_net_init(eth_mac);
     advertise_init(eth_mac);
-    path_init(eth_mac);
+    remote_init(eth_mac);
     if (!probe_init()) printf("main: probe init failed\n");
     if (!tool_init()) printf("main: tool init failed\n");
     if (!dhcpd_init()) printf("main: dhcpd init failed\n");
@@ -277,8 +288,8 @@ int main(void)
         if (neighbor_table_expire(now_ms()))
             printf("lldp: neighbor expired (%d in table)\n", neighbor_table_count());
 
-        /* The port blinker and the path test drop the link on purpose; link tracking stays frozen until they are done. */
-        if (time_reached(next_link_check) && !blink_active() && !path_busy()) {
+        /* The port blinker drops the link on purpose; link tracking stays frozen until it is done. */
+        if (time_reached(next_link_check) && !blink_active()) {
             STEP(5);
             next_link_check = make_timeout_time_ms(500);
             w5500_link_t l;
@@ -294,9 +305,9 @@ int main(void)
                 if (dropped) printf("lldp: link down, dropped %d neighbor%s\n", dropped, dropped == 1 ? "" : "s");
             }
             eth_net_set_link(l.link);
-            path_link_changed(l.link);
+            remote_link_changed(l.link);
         }
-        STEP(6); blink_poll(); path_poll();
+        STEP(6); blink_poll(); remote_poll();
         STEP(7); eth_net_poll();
         STEP(8); advertise_poll();
         STEP(9); probe_poll();

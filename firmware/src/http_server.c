@@ -7,7 +7,7 @@
 #include "usb_net.h"
 #include "tool.h"
 #include "blink.h"
-#include "path.h"
+#include "remote.h"
 #include "advertise.h"
 #include "eth_net.h"
 #include "probe.h"
@@ -37,13 +37,14 @@ typedef struct {
     bool     responding;
     bool     lan;                  /* arrived on the Ethernet side: read-only paths only */
     /* response: header (RAM, small) then body (flash or this client's buffer) */
-    char     hdr[224];
+    char     hdr[256];
     const char *hdr_ptr; size_t hdr_left;
     const char *body_ptr; size_t body_left;
     bool     body_is_ram;          /* body lives in json[] -> must copy */
     size_t   unacked;
     char     json[STATUS_JSON_MAX];
     absolute_time_t deadline;
+    uint32_t age_ms;               /* UINT32_MAX = no X-Age-Ms header */
 } conn_t;
 
 #include "app.h"
@@ -54,22 +55,6 @@ typedef struct {
 
 static conn_t conns[HTTP_MAX_CLIENTS];
 
-/* "02:50:4c:38:00:19" (or with '-') -> 6 bytes. No sscanf: it pulls in ~50 KB of newlib. */
-static bool parse_mac(const char *s, uint8_t out[6])
-{
-    for (int i = 0; i < 6; i++) {
-        int v = 0;
-        for (int j = 0; j < 2; j++, s++) {
-            char c = *s;
-            int d = c >= '0' && c <= '9' ? c - '0' : c >= 'a' && c <= 'f' ? c - 'a' + 10 : c >= 'A' && c <= 'F' ? c - 'A' + 10 : -1;
-            if (d < 0) return false;
-            v = v * 16 + d;
-        }
-        out[i] = (uint8_t)v;
-        if (i < 5) { if (*s != ':' && *s != '-') return false; s++; }
-    }
-    return *s == '\0';
-}
 static struct tcp_pcb *listen_pcb;
 static uint32_t seq;
 static absolute_time_t reboot_at;
@@ -140,11 +125,13 @@ static const char *find_header(const char *req, const char *name, size_t *len)
 static void respond(conn_t *c, const char *status, const char *ctype,
                     const char *body, size_t body_len, bool body_is_ram)
 {
+    char age[32] = "";
+    if (c->age_ms != UINT32_MAX) snprintf(age, sizeof age, "X-Age-Ms: %lu\r\n", (unsigned long)c->age_ms);
     int n = snprintf(c->hdr, sizeof c->hdr,
                      "HTTP/1.0 %s\r\nContent-Type: %s\r\nContent-Length: %u\r\n"
-                     "Cache-Control: no-store\r\nAccess-Control-Allow-Origin: *\r\n"
+                     "Cache-Control: no-store\r\nAccess-Control-Allow-Origin: *\r\n%s"
                      "Connection: close\r\n\r\n",
-                     status, ctype, (unsigned)body_len);
+                     status, ctype, (unsigned)body_len, age);
     if (n < 0 || (size_t)n >= sizeof c->hdr) n = (int)sizeof c->hdr - 1;   /* cannot happen: longest is ~185 */
     c->hdr_ptr = c->hdr;
     c->hdr_left = (size_t)n;
@@ -268,12 +255,11 @@ static void handle_request(conn_t *c)
         respond(c, ok ? "200 OK" : "400 Bad Request", "application/json", c->json, (size_t)n, true);
     } else if (strcmp(path, "/tool") == 0) {
         /* GET /tool?ping=HOST[&count=N] (N 0 = continuous) | ?trace=HOST | ?stop=1 | ?blink=1|0 | (none: state).
-         * ?path=1[&peer=MAC] runs the two-probe path test (path.h).
          * ?dhcp=1 restarts DHCP; ?relisten=1 clears the neighbor table.
-         * Results stream in /status.json "tool", "blink" and "path". */
+         * Results stream in /status.json "tool" and "blink". */
         char host[TOOL_HOST_MAX + 1] = "", err[80] = "";
         tool_kind_t kind = TOOL_IDLE; bool stop = false, ok = true; unsigned count = 5; int blink = -1;
-        bool path_go = false, have_peer = false, dhcp_retry = false, relisten = false; uint8_t peer_mac[6];
+        bool dhcp_retry = false, relisten = false;
         const char *q = query, *k, *v; size_t kl, vl;
         while (query_next(&q, &k, &kl, &v, &vl)) {
             if (query_key_is(k, kl, "ping") || query_key_is(k, kl, "trace")) {
@@ -282,22 +268,14 @@ static void handle_request(conn_t *c)
             } else if (query_key_is(k, kl, "count")) { char cv[8]; count = query_decode(v, vl, cv, sizeof cv) ? (unsigned)atoi(cv) : 999; }
             else if (query_key_is(k, kl, "stop")) stop = true;
             else if (query_key_is(k, kl, "blink")) blink = vl && v[0] == '1';
-            else if (query_key_is(k, kl, "path")) path_go = vl && v[0] == '1';
             else if (query_key_is(k, kl, "dhcp")) dhcp_retry = vl && v[0] == '1';
             else if (query_key_is(k, kl, "relisten")) relisten = vl && v[0] == '1';
-            else if (query_key_is(k, kl, "peer")) {
-                char mv[24];
-                if (query_decode(v, vl, mv, sizeof mv) && parse_mac(mv, peer_mac)) have_peer = true;
-                else { ok = false; snprintf(err, sizeof err, "peer must be a MAC like 02:50:43:aa:bb:cc"); }
-            }
             else { ok = false; snprintf(err, sizeof err, "unknown parameter"); }
         }
-        if (ok && blink == 1 && path_busy()) { ok = false; snprintf(err, sizeof err, "a path test is running"); }
-        else if (ok && blink == 1) ok = blink_start(err, sizeof err);
+        if (ok && blink == 1) ok = blink_start(err, sizeof err);
         else if (ok && blink == 0) blink_stop();
         if (ok && dhcp_retry) { eth_net_dhcp_retry(); probe_restart(); }
         if (ok && relisten) { int n = neighbor_table_clear(); printf("lldp: cleared %d neighbor%s on request\n", n, n == 1 ? "" : "s"); }
-        if (ok && path_go) ok = path_start(have_peer ? peer_mac : NULL, err, sizeof err);
         if (ok && stop) tool_stop();
         else if (ok && kind != TOOL_IDLE) {
             if (tool_get()->running) { ok = false; snprintf(err, sizeof err, "a tool is already running; stop it first"); }
@@ -322,7 +300,7 @@ static void handle_request(conn_t *c)
             if (!ok) snprintf(err, sizeof err, "flash write failed");
             else {
                 advertise_set_enabled(s.lldp_on, s.cdp_on);
-                if (s.probe != old_probe) advertise_name_changed();
+                if (s.probe != old_probe) { advertise_name_changed(); remote_name_changed(); }
                 probe_restart();
             }
             /* usb_ip applies at the next boot; the page offers a reboot */
@@ -347,6 +325,32 @@ static void handle_request(conn_t *c)
         reboot_at = make_timeout_time_ms(300);     /* let the reply go out first */
         int n = snprintf(c->json, sizeof c->json, "{\"rebooting\":true,\"bootsel\":%s}\n", reboot_bootsel ? "true" : "false");
         respond(c, "200 OK", "application/json", c->json, (size_t)n, true);
+    } else if (strcmp(path, "/peer") == 0) {
+        /* GET /peer?scan=1     -> ask the network for other testers (mDNS, rate limited); they show in "peers"
+         * GET /peer?name=NAME  -> that tester's /status.json as last fetched; each call refreshes it.
+         *                         202 while the first copy is on its way, 404 for a name not heard,
+         *                         502 when it could not be read. X-Age-Ms says how old the copy is. */
+        char nm[PEERS_NAME_MAX + 1] = "", sv[4] = "";
+        if (query_get(query, "scan", sv, sizeof sv) == 1 && sv[0] == '1') {
+            remote_scan();
+            static const char b[] = "{\"ok\":true}\n";
+            respond(c, "200 OK", "application/json", b, sizeof b - 1, false);
+        } else if (query_get(query, "name", nm, sizeof nm) == 1 && nm[0]) {
+            size_t len; uint32_t age; char err[48];
+            remote_view_t r = remote_view(nm, c->json, sizeof c->json, &len, &age, err, sizeof err);
+            if (r == REMOTE_OK) {
+                c->age_ms = age;
+                respond(c, "200 OK", "application/json", c->json, len, true);
+            } else {
+                int n = snprintf(c->json, sizeof c->json, "{\"ok\":false,\"pending\":%s,\"error\":\"%s\"}\n",
+                                 r == REMOTE_PENDING ? "true" : "false", err);
+                respond(c, r == REMOTE_PENDING ? "202 Accepted" : r == REMOTE_UNKNOWN ? "404 Not Found" : "502 Bad Gateway",
+                        "application/json", c->json, (size_t)n, true);
+            }
+        } else {
+            static const char b[] = "{\"ok\":false,\"error\":\"scan=1 or name=NAME\"}\n";
+            respond(c, "400 Bad Request", "application/json", b, sizeof b - 1, false);
+        }
     } else if (strcmp(path, "/status.json") == 0) {
         size_t len = status_render(c->json, sizeof c->json, ++seq);
         if (len) respond(c, "200 OK", "application/json", c->json, len, true);
@@ -429,8 +433,17 @@ static err_t on_accept(void *arg, struct tcp_pcb *newpcb, err_t err)
 {
     (void)arg;
     if (err != ERR_OK || !newpcb) return ERR_VAL;
+    /* USB or the port: by the address it came in on. The USB side has IPv4 and an IPv6
+     * link-local address (iOS reaches picoplug.local over the latter). */
     const struct netif *un = usb_net_netif();
-    bool lan = !un || !ip_addr_cmp(&newpcb->local_ip, &un->ip_addr);
+    bool lan = true;
+    if (un && IP_IS_V4(&newpcb->local_ip)) lan = !ip_addr_cmp(&newpcb->local_ip, &un->ip_addr);
+#if LWIP_IPV6
+    else if (un && IP_IS_V6(&newpcb->local_ip))
+        for (int i = 0; i < LWIP_IPV6_NUM_ADDRESSES; i++)
+            if (ip6_addr_isvalid(netif_ip6_addr_state(un, i)) && ip6_addr_cmp_zoneless(ip_2_ip6(&newpcb->local_ip), netif_ip6_addr(un, i)))
+                lan = false;
+#endif
     conn_t *c = NULL;
     for (int i = 0; i < HTTP_MAX_CLIENTS; i++) if (!conns[i].pcb) { c = &conns[i]; break; }
     if (!c) { tcp_abort(newpcb); return ERR_ABRT; }
@@ -441,6 +454,7 @@ static err_t on_accept(void *arg, struct tcp_pcb *newpcb, err_t err)
     c->lan = lan;
     c->hdr_left = c->body_left = c->unacked = 0;
     c->deadline = make_timeout_time_ms(10000);
+    c->age_ms = UINT32_MAX;
     tcp_arg(newpcb, c);
     tcp_recv(newpcb, on_recv);
     tcp_sent(newpcb, on_sent);
@@ -463,7 +477,7 @@ void http_server_poll(void)
 
 bool http_server_init(void)
 {
-    struct tcp_pcb *pcb = tcp_new_ip_type(IPADDR_TYPE_V4);
+    struct tcp_pcb *pcb = tcp_new_ip_type(IPADDR_TYPE_ANY);     /* IPv6 link-local too, for other testers */
     if (!pcb) return false;
     if (tcp_bind(pcb, IP_ANY_TYPE, HTTP_TCP_PORT) != ERR_OK) { tcp_abort(pcb); return false; }
     /* Listens on both interfaces; handle_request limits Ethernet-side connections to read-only paths. */

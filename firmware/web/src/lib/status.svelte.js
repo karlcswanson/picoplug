@@ -69,3 +69,48 @@ export function start() {
   tick();
   openSocket();
 }
+
+// Another tester on the port's network, read through this one: GET /peer?name= returns its
+// /status.json as this tester last fetched it (X-Age-Ms says how old). Polled while it is open.
+export const remote = $state({ name: null, status: null, age: 0, error: '', pending: false });
+let rGen = 0, rTimer = 0;
+
+async function pollRemote(g) {
+  if (g !== rGen) return;
+  const ac = new AbortController(), to = setTimeout(() => ac.abort(), 6000);
+  try {
+    const r = await fetch('/peer?name=' + encodeURIComponent(remote.name), { cache: 'no-store', signal: ac.signal });
+    const j = await r.json();
+    if (g !== rGen) return;
+    if (r.status === 200) {
+      remote.status = j; remote.age = +(r.headers.get('X-Age-Ms') || 0); remote.error = ''; remote.pending = false;
+    } else {
+      remote.pending = !!j.pending; remote.error = j.pending ? '' : j.error || 'no answer';
+    }
+  } catch (e) {
+    if (g === rGen) { remote.pending = false; remote.error = 'no answer'; }
+  }
+  clearTimeout(to);
+  if (g === rGen) rTimer = setTimeout(() => pollRemote(g), remote.status ? 2000 : 800);
+}
+
+export function viewRemote(name) {
+  clearTimeout(rTimer);
+  Object.assign(remote, { name, status: null, age: 0, error: '', pending: true });
+  pollRemote(++rGen);
+  scrollTo(0, 0);
+}
+
+export function closeRemote() {
+  clearTimeout(rTimer); rGen++;
+  Object.assign(remote, { name: null, status: null, age: 0, error: '', pending: false });
+}
+
+// Ask the network for other testers (mDNS, the firmware rate-limits it): now, and every
+// 60 s while the page is open and in view. Nothing is asked while nobody is looking.
+let scanTimer = 0;
+export function scanPeers() {
+  clearTimeout(scanTimer);
+  if (!document.hidden) fetch('/peer?scan=1', { cache: 'no-store' }).catch(() => {});
+  scanTimer = setTimeout(scanPeers, 60000);
+}

@@ -11,6 +11,8 @@
 #include "lwip/igmp.h"
 #include "lwip/dns.h"
 #include "lwip/etharp.h"
+#include "lwip/ethip6.h"
+#include "lwip/mld6.h"
 #include "lwip/netif.h"
 #include "lwip/prot/dhcp.h"
 #include "lwip/sys.h"
@@ -65,13 +67,14 @@ static err_t eth_linkoutput(struct netif *netif, struct pbuf *p)
 static err_t eth_init_cb(struct netif *netif)
 {
     netif->mtu = 1500;
-    netif->flags = NETIF_FLAG_BROADCAST | NETIF_FLAG_ETHARP | NETIF_FLAG_IGMP;
+    netif->flags = NETIF_FLAG_BROADCAST | NETIF_FLAG_ETHARP | NETIF_FLAG_IGMP | NETIF_FLAG_MLD6;
     netif->name[0] = 'e';
     netif->name[1] = 't';
     netif->hwaddr_len = 6;
     memcpy(netif->hwaddr, our_mac, 6);
     netif->linkoutput = eth_linkoutput;
     netif->output = etharp_output;
+    netif->output_ip6 = ethip6_output;
 #if LWIP_NETIF_HOSTNAME
     netif->hostname = USB_NET_HOSTNAME;     /* sent as DHCP option 12 */
 #endif
@@ -83,6 +86,8 @@ void eth_net_init(const uint8_t mac[6])
     memcpy(our_mac, mac, 6);
     dhcp_info_init(mac);
     netif_add(&eth_netif, IP4_ADDR_ANY4, IP4_ADDR_ANY4, IP4_ADDR_ANY4, NULL, eth_init_cb, ethernet_input);
+    /* IPv6 link-local only (fe80:: from the MAC), so other testers can reach this one with no DHCP */
+    netif_create_ip6_linklocal_address(&eth_netif, 1);
     netif_set_up(&eth_netif);
     /* Link is down until the PHY says otherwise; dhcp_start() waits for it
      * (LWIP_DHCP_CHECK_LINK_UP) and netif_set_link_up() kicks it off. */

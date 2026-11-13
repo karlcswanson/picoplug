@@ -9,7 +9,7 @@
 
 #include "pico.h"
 
-#define FW_VERSION              "0.3.6"
+#define FW_VERSION              "0.4.0"
 
 /* ---- W5500 SPI wiring ------------------------------------------------- */
 #if defined(WIZNET_W55RP20_EVB_PICO)
