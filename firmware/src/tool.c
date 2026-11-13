@@ -14,6 +14,15 @@
 #include <stdio.h>
 #include <string.h>
 
+/* IPv4 only: with IPv6 built in for the port's link-local side, ipaddr_aton() would also take "fe80::1". */
+static bool aton4(const char *s, ip_addr_t *out)
+{
+    ip4_addr_t a;
+    if (!ip4addr_aton(s, &a)) return false;
+    ip_addr_copy_from_ip4(*out, a);
+    return true;
+}
+
 #define TOOL_ID           0x5054          /* "PT": distinct from the probe's id */
 #define PING_INTERVAL_MS  1000
 #define PING_TIMEOUT_MS   1000
@@ -172,7 +181,7 @@ bool tool_start(tool_kind_t kind, const char *host, uint16_t count, char *err, s
     strncpy(ts.host, host, TOOL_HOST_MAX);
     ts.started_ms = now_ms();
     waiting = false;
-    if (ipaddr_aton(host, &target)) {
+    if (aton4(host, &target)) {
         memcpy(ts.addr, &ip_2_ip4(&target)->addr, 4);
         ts.resolved = true;
         st = S_SEND;

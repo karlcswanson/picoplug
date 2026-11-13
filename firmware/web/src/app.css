@@ -1323,3 +1323,46 @@ dialog.sheet::backdrop {
   width: 100%;
   justify-content: flex-start;
 }
+
+/* another tester read through this one */
+/* another tester's page: a bar in its probe color under the header, sticky with it */
+header.remote { border-bottom-color: var(--rb); }
+.rb0 { --rb: #141414; --rbt: #fff; }
+.rb1 { --rb: #7b4a1e; --rbt: #fff; }
+.rb2 { --rb: #c8102e; --rbt: #fff; }
+.rb3 { --rb: #f07d00; --rbt: #141414; }
+.rb4 { --rb: #ffcf00; --rbt: #141414; }
+.rb5 { --rb: #1d8a3a; --rbt: #fff; }
+.rb6 { --rb: #1f5fc2; --rbt: #fff; }
+.rb7 { --rb: #7a3cb8; --rbt: #fff; }
+.rb8 { --rb: #8c8f93; --rbt: #141414; }
+.rb9 { --rb: #fff; --rbt: #141414; }
+.rbx { --rb: #5c5b57; --rbt: #fff; }
+.rbar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px max(12px, calc((100% - 560px) / 2 + 12px));
+  background: var(--rb);
+  color: var(--rbt);
+  border-top: 1px solid rgba(255, 255, 255, .25);
+}
+.rbar b { font: 700 15px/1.2 var(--mono); }
+.rbar .pb { margin-right: 0; border-color: currentColor; }
+.rbar .rnote { font-size: 13px; opacity: .8; flex: 1; min-width: 0; }
+.rbar button.q { margin-left: auto; background: #fff; color: #141414; border-color: rgba(0, 0, 0, .35); }
+/* a tester in the Other probes card: the whole row opens it */
+button.kv.peer {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  align-items: center;
+  column-gap: 8px;
+  width: 100%;
+  text-align: left;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+}
+button.kv.peer .k, button.kv.peer .v { grid-column: 1; }
+button.kv.peer > svg { grid-column: 2; grid-row: 1 / span 2; color: var(--mut); }
+button.kv.peer:active { background: var(--yel); }

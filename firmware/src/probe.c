@@ -17,6 +17,15 @@
 #include <stdio.h>
 #include <string.h>
 
+/* IPv4 only: with IPv6 built in for the port's link-local side, ipaddr_aton() would also take "fe80::1". */
+static bool aton4(const char *s, ip_addr_t *out)
+{
+    ip4_addr_t a;
+    if (!ip4addr_aton(s, &a)) return false;
+    ip_addr_copy_from_ip4(*out, a);
+    return true;
+}
+
 #define PING_ID        0x5043
 #define PING_DATA_LEN  32
 #define PING_TIMEOUT_MS 1000
@@ -136,7 +145,7 @@ static void start_run(void)
 {
     uint32_t runs = res.runs;
     memset(&res, 0, sizeof res);
-    if (!ipaddr_aton(settings_get()->ping_target, &inet_addr)) ipaddr_aton(PROBE_INET_TARGET, &inet_addr);
+    if (!aton4(settings_get()->ping_target, &inet_addr)) aton4(PROBE_INET_TARGET, &inet_addr);
     res.runs = runs + 1;
     res.running = true;
     state = ST_ARP;
@@ -150,7 +159,7 @@ bool probe_init(void)
     if (!ping_pcb) return false;
     raw_recv(ping_pcb, ping_recv, NULL);
     raw_bind(ping_pcb, IP_ADDR_ANY);
-    ipaddr_aton(PROBE_INET_TARGET, &inet_addr);
+    aton4(PROBE_INET_TARGET, &inet_addr);
     res.phase = "idle";
     return true;
 }
@@ -221,7 +230,7 @@ void probe_poll(void)
             dns_cb_done = false;
             dns_started = get_absolute_time();
             const settings_t *cfg = settings_get();
-            res.dns_custom = cfg->dns_server[0] && ipaddr_aton(cfg->dns_server, &custom_dns);
+            res.dns_custom = cfg->dns_server[0] && aton4(cfg->dns_server, &custom_dns);
             if (res.dns_custom) {
                 /* lwIP has one resolver list; swap slot 0 for this lookup and put it back after */
                 ip_addr_copy(saved_dns0, *dns_getserver(0));

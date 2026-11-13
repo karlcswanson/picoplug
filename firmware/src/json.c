@@ -494,46 +494,30 @@ static void write_blink(jw_t *w, const blink_state_t *b, uint32_t remaining_s)
         jw_kv_uint(w, "remaining_s", remaining_s);
         jw_kv_uint(w, "cycles", b->cycles);
         jw_kv_uint(w, "link_ups", b->link_ups);
-        if (b->pulse) jw_kv_bool(w, "pulse", true);
     }
     jw_kv_uint(w, "generation", b->generation);
     jw_obj_end(w);
 }
 
-static void write_peers(jw_t *w, const peer_table_t *t, const uint8_t *self, uint32_t now_ms)
+static void write_peers(jw_t *w, const peers_table_t *t, const char *self)
 {
-    char me[18] = "";
-    if (self) mac_str(self, me);
     jw_key(w, "peers"); jw_obj_begin(w);
-    int n = peer_count(t);
-    jw_kv_uint(w, "count", (uint32_t)n);
-    /* source MACs heard on the port that are not probes: none on a bare probe-to-probe cable */
-    uint32_t others = 0;
-    for (int i = 0; i < t->nmacs; i++) {
-        bool is_peer = false;
-        for (int j = 0; j < PEER_MAX; j++) if (t->p[j].used && !memcmp(t->p[j].mac, t->macs[i], 6)) is_peer = true;
-        if (!is_peer) others++;
-    }
-    jw_kv_uint(w, "other_macs", others);
-    if (t->macs_full) jw_kv_bool(w, "other_macs_capped", true);
+    if (self && self[0]) jw_kv_str(w, "name", self);
+    jw_kv_uint(w, "count", (uint32_t)peers_count(t));
     jw_key(w, "list"); jw_arr_begin(w);
-    int listed = 0;
-    for (int i = 0; i < PEER_MAX && listed < 4; i++) {
-        const peer_t *p = &t->p[i];
+    for (int i = 0; i < PEERS_MAX; i++) {
+        const peers_entry_t *p = &t->p[i];
         if (!p->used) continue;
-        listed++;
         jw_obj_begin(w);
-        jw_kv_mac(w, "mac", p->mac);
-        jw_kv_uint(w, "age_s", (now_ms - p->last_ms) / 1000u);
-        jw_kv_uint(w, "uptime_s", p->info.uptime_s);
-        if (p->info.speed) { jw_kv_uint(w, "speed", p->info.speed); jw_kv_bool(w, "full_duplex", p->info.full); }
-        if (p->info.chassis[0]) jw_kv_str(w, "chassis", p->info.chassis);
-        if (p->info.port[0]) jw_kv_str(w, "port", p->info.port);
-        if (p->info.pvid) jw_kv_uint(w, "pvid", p->info.pvid);
-        if (me[0] && !strcmp(p->info.chassis, me)) jw_kv_bool(w, "sees_us", true);
-        jw_kv_str(w, "fw", p->info.fw);
-        if (p->info.probe <= 9) jw_kv_uint(w, "probe", p->info.probe);
-        if (p->echoes) { jw_kv_uint(w, "rtt_ms", p->rtt_last_ms); jw_kv_uint(w, "rtt_min_ms", p->rtt_min_ms); }
+        jw_kv_str(w, "name", p->name);
+        if (p->probe <= 9) jw_kv_uint(w, "probe", p->probe);
+        if (p->chassis[0]) jw_kv_str(w, "chassis", p->chassis);
+        if (p->sys_name[0]) jw_kv_str(w, "sys_name", p->sys_name);
+        if (p->port[0]) jw_kv_str(w, "port", p->port);
+        if (p->has_pvid) jw_kv_uint(w, "pvid", p->pvid);
+        if (p->fw[0]) jw_kv_str(w, "fw", p->fw);
+        if (p->has_ip6) { char b[48]; lldp_format_addr(LLDP_AFI_IPV6, p->ip6, 16, b, sizeof b); jw_kv_str(w, "ip6", b); }
+        if (p->has_ip4) jw_kv_ip(w, "ip4", p->ip4);
         jw_obj_end(w);
     }
     jw_arr_end(w);
@@ -541,37 +525,6 @@ static void write_peers(jw_t *w, const peer_table_t *t, const uint8_t *self, uin
     jw_obj_end(w);
 }
 
-static const char *path_phase_name(path_phase_t p)
-{
-    switch (p) {
-    case PT_ASK: return "asking";
-    case PT_WATCH: return "watching";
-    case PT_RECOVER: return "recovering";
-    case PT_DONE: return "done";
-    default: return "idle";
-    }
-}
-
-static void write_path(jw_t *w, const path_test_t *p, uint32_t now_ms)
-{
-    jw_key(w, "path"); jw_obj_begin(w);
-    jw_kv_str(w, "phase", path_phase_name(p->phase));
-    if (p->phase != PT_IDLE) {
-        jw_kv_mac(w, "peer", p->peer);
-        if (p->verdict != PATH_NONE) jw_kv_str(w, "verdict", path_verdict_name(p->verdict));
-        jw_kv_bool(w, "acked", p->acked_ms != 0);
-        jw_kv_bool(w, "own_link_dropped", p->own_link_dropped);
-        if (p->own_link_dropped) jw_kv_uint(w, "own_down_ms", p->own_down_ms);
-        jw_kv_bool(w, "peer_went_silent", p->peer_went_silent);
-        jw_kv_bool(w, "peer_came_back", p->peer_came_back);
-        if (p->peer_came_back) jw_kv_uint(w, "peer_back_ms", p->peer_back_ms);
-        uint32_t end = p->phase == PT_DONE ? p->finished_ms : now_ms;
-        jw_kv_uint(w, "elapsed_ms", end - p->started_ms);
-        if (p->phase == PT_DONE) jw_kv_uint(w, "age_s", (now_ms - p->finished_ms) / 1000u);
-    }
-    jw_kv_uint(w, "generation", p->generation);
-    jw_obj_end(w);
-}
 
 static const char *power_priority_str(uint8_t p)
 {
@@ -999,8 +952,7 @@ void status_json_build(jw_t *w, const status_info_t *si, uint32_t now_ms)
     if (si->igmp) write_igmp(w, si->igmp, now_ms);
     if (si->ptp1 && si->ptp2) write_ptp(w, si->ptp1, si->ptp2, now_ms);
     if (si->blink) write_blink(w, si->blink, si->blink_remaining_s);
-    if (si->peers) write_peers(w, si->peers, si->self_mac, now_ms);
-    if (si->path) write_path(w, si->path, now_ms);
+    if (si->peers) write_peers(w, si->peers, si->peers_name);
 
     write_tx(w, si);
 

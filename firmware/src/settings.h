@@ -28,6 +28,9 @@ typedef struct {
     char usb_ip[16];                /* the device's own address on the USB link; /24, host gets .ip+1 */
     uint8_t probe;                  /* 0-9, colored by the resistor code; SETTINGS_PROBE_NONE unset */
     char form_url[SETTINGS_FORM_URL_MAX + 1];   /* link template behind the Port view's Share button, "" = no link */
+    bool has_mac;                   /* eth_mac below picked yet           */
+    uint8_t eth_mac[3];             /* low 3 bytes of the port's MAC, random, picked on the first boot:
+                                     * the W55RP20's flash ID is the same on every unit */
 } settings_t;
 
 #define SETTINGS_BLOB_MAX 512       /* encoded size never exceeds this     */
@@ -39,7 +42,7 @@ size_t settings_encode(const settings_t *s, uint8_t *buf, size_t cap);
 bool   settings_decode(const uint8_t *buf, size_t len, settings_t *out);
 /* Apply "key=value&key=value" (URL-encoded) to *s. Keys: ping_target,
  * dns_name, dns_server, lldp, cdp, usb_ip, probe ("" = none), form_url (http(s) URL or ""),
- * reset (keeps probe and form_url). On failure *s is unchanged and
+ * reset (keeps probe, form_url and the MAC). On failure *s is unchanged and
  * err names the problem. Returns true if the query was valid. changed is
  * set when any field differs afterwards. */
 bool   settings_apply_query(settings_t *s, const char *query, char *err, size_t errcap, bool *changed);

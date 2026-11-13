@@ -40,26 +40,6 @@ bool blink_start(char *err, size_t errcap)
     return true;
 }
 
-bool blink_pulse(uint32_t off_ms)
-{
-    if (!w5500_ready() || bs.active) return false;
-    if (off_ms < 500) off_ms = 500;
-    if (off_ms > 5000) off_ms = 5000;
-    uint32_t g = bs.generation;
-    memset(&bs, 0, sizeof bs);
-    bs.generation = g + 1;
-    bs.active = true;
-    bs.pulse = true;
-    bs.started_ms = now_ms();
-    end_at = get_absolute_time();
-    w5500_phy_power(false);
-    phase = B_OFF;
-    seen_up = false;
-    next_edge = make_timeout_time_ms(off_ms);
-    printf("blink: pulse %lu ms for a peer path test\n", (unsigned long)off_ms);
-    return true;
-}
-
 static void settle(void)
 {
     if (phase == B_OFF) w5500_phy_power(true);
@@ -80,8 +60,7 @@ void blink_poll(void)
     case B_IDLE: return;
     case B_OFF:
         if (time_reached(next_edge)) {
-            if (bs.pulse) { w5500_phy_power(true); phase = B_ON; bs.cycles = 1; settle(); }
-            else set_phy(true);
+            set_phy(true);
         }
         return;
     case B_ON:
@@ -95,7 +74,6 @@ void blink_poll(void)
         return;
     case B_SETTLE:
         w5500_get_link(&l);
-        if (l.link && !seen_up) { seen_up = true; if (bs.pulse) bs.link_ups = 1; }
         if (l.link || time_reached(settle_until)) { phase = B_IDLE; bs.active = false; bs.generation++; }
         return;
     }

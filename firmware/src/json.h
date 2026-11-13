@@ -18,7 +18,7 @@
 #include "lacp.h"
 #include "mcast.h"
 #include "blink.h"
-#include "path.h"
+#include "peers.h"
 
 #define JW_MAX_DEPTH 12
 
@@ -124,9 +124,9 @@ typedef struct {
     const ptp_state_t *ptp1, *ptp2; /* NULL = omit "ptp" (both or neither) */
     const blink_state_t *blink;    /* NULL = omit "blink" */
     uint32_t    blink_remaining_s;
-    const peer_table_t *peers;     /* NULL = omit "peers" */
-    const path_test_t  *path;      /* NULL = omit "path" */
-    const uint8_t      *self_mac;  /* ours, for spotting a peer that sees us as its neighbor */
+    const peers_table_t *peers;    /* NULL = omit "peers" */
+    const char  *peers_name;       /* our own mDNS name on the port */
+    const uint8_t *self_mac;       /* ours, for "eth.mac" */
     uint32_t    link_up_for_s;     /* for "stp": seconds since link-up, 0 = down */
     /* our own advertisements; tx_present = emit the "tx" object */
     bool        tx_present;

@@ -67,7 +67,6 @@
     tool(kind + '=' + encodeURIComponent(h) + (kind === 'ping' ? '&count=0' : ''));
   }
   let blinkStatus = $derived(!blinking ? ''
-    : blink.pulse ? 'path test · link down'
     : blink.remaining_s ? 'blinking · ' + blink.remaining_s + ' s left'
     : 'waiting for link…');
 

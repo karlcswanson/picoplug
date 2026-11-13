@@ -25,10 +25,10 @@ What the page answers:
   any of it.
 * **Tools:** ping with a live RTT plot, traceroute, and a port blinker
   that flaps the link so the switch LED shows you the port.
-* **Two probes:** probes find each other on the wire (no IP needed), show
-  which switch and port the other one is on and its PVID, and
-  test whether the run between them is a direct cable or goes through a
-  switch.
+* **Other probes:** testers on the same network find each other with
+  mDNS (no DHCP needed: they talk over IPv6 link-local), show which
+  switch and port each other one is on and its PVID, and tap View to read
+  another tester's whole page from your phone through the one you hold.
 * **History** of every port visited, kept in the browser, exportable as CSV.
 * **Share:** a Share button that links the port to the picoplug share
   page, which shows it to whoever opens the link, or copies it as text.
@@ -45,9 +45,10 @@ What the page answers:
 <picture><source media="(prefers-color-scheme: dark)" srcset="docs/img/probes-dark.png"><img src="docs/img/probes.png" alt="Other probes card: a second tester on the same switch and a path test result" width="380"></picture>
 </p>
 
-The same page is served read-only on the port's own DHCP address, so the
-tester can be left on a far port with USB power and read from a laptop on
-the network. The page gets every change pushed over a WebSocket (`/ws`),
+The same page is served read-only on the port side, at the tester's DHCP
+address and as `picoplug-N.local` (N its probe number), so a tester can be
+left on a far port with USB power and read from a laptop on the network,
+or from another tester. The page gets every change pushed over a WebSocket (`/ws`),
 so it updates as the tester hears things. A raw NDJSON status stream is on
 TCP :9000 (USB side) for scripts.
 

@@ -97,6 +97,30 @@ def main():
                                    "defaults": {"ping_target": "1.1.1.1", "dns_name": "clockclub.net", "dns_server": "", "usb_ip": "192.168.7.1",
                                                 "form_url": "https://clockclub.net/apps/picoplug/#{share}"}}).encode() + b"\n"
                 ctype = "application/json"
+            elif path == "/peer":
+                # GET /peer?scan=1 -> ok; ?name=NAME -> another tester's status: a tester listed in the
+                # current line's peers reads as line 6 (the LAG port), any other name is 404
+                q = dict(kv.split("=", 1) for kv in query.split("&") if "=" in kv)
+                names = [x["name"] for x in json.loads(lines[current()]).get("peers", {}).get("list", [])]
+                if q.get("scan") == "1":
+                    body, ctype = b'{"ok":true}\n', "application/json"
+                elif urllib.parse.unquote(q.get("name", "")) in names:
+                    body = lines[6].encode()
+                    self.send_response(200)
+                    self.send_header("Content-Type", "application/json")
+                    self.send_header("Content-Length", str(len(body)))
+                    self.send_header("X-Age-Ms", "300")
+                    self.end_headers()
+                    self.wfile.write(body)
+                    return
+                else:
+                    body = b'{"ok":false,"pending":false,"error":"not heard on this network"}\n'
+                    self.send_response(404)
+                    self.send_header("Content-Type", "application/json")
+                    self.send_header("Content-Length", str(len(body)))
+                    self.end_headers()
+                    self.wfile.write(body)
+                    return
             elif path == "/__mock/ws":
                 a.ws = query != "0"
                 body = b'{"ok":true}\n'

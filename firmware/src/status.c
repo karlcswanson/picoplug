@@ -15,7 +15,7 @@
 #include "dhcp_info.h"
 #include "tool.h"
 #include "blink.h"
-#include "path.h"
+#include "remote.h"
 
 #include "pico/time.h"
 
@@ -106,8 +106,8 @@ size_t status_render(char *buf, size_t cap, uint32_t seq)
         .ptp1 = app_ptp_state(1), .ptp2 = app_ptp_state(2),
         .blink = blink_get(),
         .blink_remaining_s = blink_remaining_s(),
-        .peers = path_peers(),
-        .path = path_test(),
+        .peers = remote_peers(),
+        .peers_name = remote_name(),
         .self_mac = app_eth_mac(),
         .link_up_for_s = app_link_up_for_ms() / 1000u,
         .tx_present = true,
@@ -149,6 +149,6 @@ uint32_t status_fingerprint(void)
     fp ^= app_igmp_state()->generation * 0x200000u;
     fp ^= app_ptp_state(1)->generation * 0x800000u;
     fp ^= app_ptp_state(2)->generation * 0x2000000u;
-    fp ^= path_generation() * 0x4000000u;
+    fp ^= remote_generation() * 0x4000000u;
     return fp;
 }

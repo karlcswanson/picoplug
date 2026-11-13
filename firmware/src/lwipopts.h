@@ -1,8 +1,9 @@
 /*
  * lwipopts.h - lwIP configuration for the USB network link.
  *
- * NO_SYS, IPv4 only, raw API only. Sized for a handful of TCP clients
- * (NDJSON on :9000 and HTTP on :80) on a single 192.168.7.0/24 link.
+ * NO_SYS, raw API only. Sized for a handful of TCP clients (NDJSON on :9000
+ * and HTTP on :80). IPv4 on both links; IPv6 link-local on the Ethernet side
+ * only, for finding and reading other testers with mDNS (remote.h).
  */
 #ifndef LWIPOPTS_H
 #define LWIPOPTS_H
@@ -22,7 +23,7 @@
  * DHCP, DNS and IGMP but NOT the mDNS responder, which arms several timers
  * per netif at link-up; with the default the pool ran dry and lwIP hit
  * "sys_timeout: timeout != NULL, pool MEMP_SYS_TIMEOUT is empty". */
-#define MEMP_NUM_SYS_TIMEOUT            24
+#define MEMP_NUM_SYS_TIMEOUT            32     /* + mDNS on the port, ND6, MLD */
 #define MEMP_NUM_RAW_PCB                2
 #define PBUF_POOL_SIZE                  16
 
@@ -34,19 +35,34 @@
 #define LWIP_DNS                        1      /* resolver for the port probe    */
 #define DNS_MAX_SERVERS                 2
 #define DNS_TABLE_SIZE                  2
+#define LWIP_DNS_ADDRTYPE_DEFAULT       0      /* LWIP_DNS_ADDRTYPE_IPV4: tools and probe are IPv4 */
 #define LWIP_IGMP                       1      /* mDNS needs multicast           */
 #ifndef USB_MDNS
 #define USB_MDNS                        1
 #endif
-#define LWIP_MDNS_RESPONDER             USB_MDNS   /* picoplug.local on the USB link */
-#define MDNS_MAX_SERVICES               1
-#define LWIP_NUM_NETIF_CLIENT_DATA      1      /* mDNS per-netif data            */
+#define LWIP_MDNS_RESPONDER             USB_MDNS   /* picoplug.local on USB; picoplug-N on the port */
+#define MDNS_MAX_SERVICES               1          /* _picoplug._tcp on the port */
+#define LWIP_MDNS_SEARCH                1          /* find the other testers */
+#define MDNS_MAX_REQUESTS               1
+#define MDNS_OUTPUT_PACKET_SIZE         1450
+#define LWIP_NUM_NETIF_CLIENT_DATA      2      /* mDNS per-netif data, MLD6      */
 #define LWIP_NETIF_EXT_STATUS_CALLBACK  1      /* mDNS watches address changes   */
 #define LWIP_ICMP                       1
 #define LWIP_UDP                        1
 #define LWIP_TCP                        1
 #define LWIP_IPV4                       1
-#define LWIP_IPV6                       0
+#define LWIP_IPV6                       1      /* link-local on the port only    */
+#define LWIP_IPV6_AUTOCONFIG            0      /* no addresses from router adverts */
+#define LWIP_IPV6_SEND_ROUTER_SOLICIT   0      /* and never ask for them         */
+#define LWIP_IPV6_DHCP6                 0
+#define LWIP_IPV6_MLD                   1      /* snooping switches forward ff02::fb */
+#define LWIP_IPV6_FRAG                  0
+#define LWIP_IPV6_REASS                 0
+#define LWIP_ND6_NUM_NEIGHBORS          8
+#define LWIP_ND6_NUM_DESTINATIONS       8
+#define LWIP_ND6_NUM_PREFIXES           2
+#define LWIP_ND6_NUM_ROUTERS            2
+#define MEMP_NUM_MLD6_GROUP             6
 #define LWIP_ARP                        1
 #define LWIP_ETHERNET                   1
 #define ETHARP_SUPPORT_STATIC_ENTRIES   1

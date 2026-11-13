@@ -7,6 +7,7 @@
 
 #include "tusb.h"
 #include "lwip/etharp.h"
+#include "lwip/ethip6.h"
 #include "lwip/init.h"
 #include "lwip/netif.h"
 #include "lwip/pbuf.h"
@@ -70,12 +71,15 @@ static err_t ip4_output_fn(struct netif *netif, struct pbuf *p, const ip4_addr_t
 static err_t netif_init_cb(struct netif *netif)
 {
     netif->mtu = CFG_TUD_NET_MTU;
-    netif->flags = NETIF_FLAG_BROADCAST | NETIF_FLAG_ETHARP | NETIF_FLAG_IGMP | NETIF_FLAG_LINK_UP | NETIF_FLAG_UP;
+    netif->flags = NETIF_FLAG_BROADCAST | NETIF_FLAG_ETHARP | NETIF_FLAG_IGMP | NETIF_FLAG_MLD6 | NETIF_FLAG_LINK_UP | NETIF_FLAG_UP;
     netif->state = NULL;
     netif->name[0] = 'u';
     netif->name[1] = 's';
     netif->linkoutput = linkoutput_fn;
     netif->output = ip4_output_fn;
+#if LWIP_IPV6
+    netif->output_ip6 = ethip6_output;   /* link-local only: lwIP's mDNS probes on IPv4 and IPv6 and stalls without it */
+#endif
 #if LWIP_NETIF_HOSTNAME
     netif->hostname = USB_NET_HOSTNAME;
 #endif
@@ -96,6 +100,7 @@ void usb_net_init(const uint8_t host_mac[6], const uint8_t dev_mac[6])
     netif_add(netif, &ipaddr, &netmask, &gateway, NULL, netif_init_cb, ethernet_input);
     netif_set_default(netif);
     netif_set_up(netif);
+    netif_create_ip6_linklocal_address(netif, 1);
     netif_set_link_up(netif);
 
 #if LWIP_MDNS_RESPONDER

@@ -308,24 +308,37 @@ def main():
         check("LACP port channel" not in text and "Use a port outside" not in text and cdp.js("!!document.querySelector('#pc-dot1x.empty')"), "no DHCP hint or advice about the LAG")
         check(tap('LACP') == '2', 'LAG card copies the LACP key')
 
-        # --- case 7: another probe on the same switch, path test says switched, PVIDs differ
+        # --- case 7: another tester on the same switch (mDNS), PVIDs differ; tapping it reads it through this one
         load(7)
         text = cdp.js("document.body.innerText")
-        check("other probes" in text.lower() and "02:50:43:aa:bb:02" in text and "same switch" in text and "mgi7" in text, "peer row names the shared switch and its port")
-        check("PVID 10" in text and "there," not in text, "peer row shows its PVID without flagging it")
-        check("link stayed up" in text and "back after 31 s" in text and "31 s" in text and "portfast" not in text and "Through a switch" not in text, "path test states what the link did, no verdict or hint")
-        check("5 other source MACs heard" in text, "other-devices count")
-        check(cdp.js("[...document.querySelectorAll('#pc-peer button')].some(b=>b.textContent.trim()==='Test path')"), "Test path button present when idle")
+        check("other probes" in text.lower() and "picoplug-5" in text and "same switch (Switch), port mgi7" in text, "peer row names the shared switch and its port")
+        check("PVID 10" in text and "192.168.109.55" in text and "there," not in text, "peer row shows its PVID and address without flagging them")
+        check("Test path" not in text and "Other devices" not in text, "no path test and no MAC census any more")
         check(cdp.js("document.querySelector('.logo .pb2')?.textContent") == "2", "header shows this unit's probe badge, red for 2")
         check("Probe 5 · green" in text and cdp.js("!!document.querySelector('#pc-peer .pb5')"), "peer row shows the other probe's number and color")
         check(cdp.js("document.title").endswith("picoplug-2"), "tab title carries the probe number")
+        check(not cdp.js("!!document.querySelector('#pc-peer .kv.copy')") and not cdp.js("[...document.querySelectorAll('#pc-peer button')].some(b=>b.textContent.trim()==='View')"), 'peer row has no copy and no View button')
+        cdp.js("document.querySelector('#pc-peer button.kv.peer').click()")
+        for _ in range(30):
+            if "not forwarding" in cdp.js("document.body.innerText"): break
+            time.sleep(0.2)
+        text = cdp.js("document.body.innerText")
+        check(cdp.js("document.querySelector('header .rbar b')?.textContent") == "picoplug-5" and "live" in text, "tapping the row opens the other tester, named in a bar in the header")
+        check(cdp.js("!!document.querySelector('header .rbar .pb5')"), "the bar carries its probe badge")
+        check(cdp.js("getComputedStyle(document.querySelector('header .rbar')).backgroundColor") == "rgb(29, 138, 58)", "the bar is the remote probe's color (green for 5)")
+        check(cdp.js("getComputedStyle(document.querySelector('header')).position") == "sticky", "the header with the bar is sticky")
+        check("not forwarding" in text and "key 2" in text, "its cards show its own status")
+        check(not cdp.js("!!document.querySelector('#pc-peer')"), "no Other probes card inside another tester")
+        check(cdp.js("document.title").endswith("picoplug-2"), "the tab title stays on this unit")
+        cdp.js("[...document.querySelectorAll('header .rbar button')].find(b=>b.textContent.trim()==='Back').click()"); time.sleep(0.5)
+        text = cdp.js("document.body.innerText")
+        check(not cdp.js("!!document.querySelector('header .rbar')") and "picoplug-5" in text and "not forwarding" not in text, "Back returns to this tester")
 
-        # --- case 8: a bare cable between two probes
+        # --- case 8: a tester on a bare cable, found by its link-local address, no switch
         load(8)
         text = cdp.js("document.body.innerText")
-        check("link dropped" in text and "down 5.2 s" in text and "Direct cable" not in text, "path test: link dropped with the other probe")
-        check("neighbor: this probe" in text, "peer that sees us as its neighbor")
-        check("Other devices" in text and "none heard" in text and "nothing but probes" not in text, "no other MACs on a bare cable, stated plainly")
+        check("picoplug-a1b2" in text and "no switch heard" in text, "peer with no switch says so")
+        check(cdp.js("!document.querySelector('#pc-peer .pb')"), "no badge for a tester without a probe number")
         cdp.call("Emulation.setDeviceMetricsOverride", width=375, height=800, deviceScaleFactor=1, mobile=True)
         for i in (7, 8):
             load(i)

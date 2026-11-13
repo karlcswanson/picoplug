@@ -98,8 +98,8 @@ add_executable(picolldp
     src/blink.c
     src/eapol.c
     src/lacp.c
-    src/peer.c
-    src/path.c
+    src/peers.c
+    src/remote.c
     src/mcast.c
     src/lldp_print.c
     src/neighbor_table.c
@@ -170,6 +170,7 @@ set_source_files_properties(${IOLIB}/wizchip_conf.c ${IOLIB}/W5500/w5500.c
 target_link_libraries(picolldp PRIVATE
     pico_stdlib
     pico_unique_id
+    pico_rand
     pico_bootrom
     hardware_spi
     hardware_pio
@@ -179,6 +180,7 @@ target_link_libraries(picolldp PRIVATE
     tinyusb_device
     pico_lwip_core
     pico_lwip_core4
+    pico_lwip_core6
     pico_lwip_mdns
     pico_lwip_arch
 )

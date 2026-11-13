@@ -107,7 +107,7 @@ static void send_reply(const uint8_t *req, uint8_t msgtype, bool assign, const i
         !ip_addr_isbroadcast(dst_hint, usb_net_netif())) {
         dst = *dst_hint;
     } else {
-        ip_addr_set_ip4_u32(&dst, PP_HTONL(0xFFFFFFFFu));
+        IP_ADDR4(&dst, 255, 255, 255, 255);
     }
     err_t e = udp_sendto_if(pcb, p, &dst, DHCP_CLIENT_PORT, usb_net_netif());
     if (e != ERR_OK) printf("dhcpd: send failed (%d)\n", e);
