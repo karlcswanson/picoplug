@@ -5,6 +5,12 @@ switch port and tells you, on your phone, what that port is. No app, no
 account, no extra hardware: the board appears over USB-C as a network
 adapter and serves one web page at http://192.168.7.1/ (picoplug.local).
 
+<p>
+<picture><source media="(prefers-color-scheme: dark)" srcset="docs/img/port-dark.png"><img src="docs/img/port.png" alt="Port tab: the switch and port the tester is on, with PVID, voice VLAN and the network checks" width="260"></picture>
+<picture><source media="(prefers-color-scheme: dark)" srcset="docs/img/tools-dark.png"><img src="docs/img/tools.png" alt="Tools tab: ping with a round-trip plot" width="260"></picture>
+<picture><source media="(prefers-color-scheme: dark)" srcset="docs/img/setup-dark.png"><img src="docs/img/setup.png" alt="Setup tab" width="260"></picture>
+</p>
+
 What the page answers:
 
 * **Which switch and port am I on?** LLDP and CDP neighbor: switch name,
@@ -28,6 +34,16 @@ What the page answers:
   page, which shows it to whoever opens the link, or copies it as text.
   The link can point at your own web form instead (a NOC request form, a
   ticket) with the switch, port and VLAN filled in.
+
+<p>
+<picture><source media="(prefers-color-scheme: dark)" srcset="docs/img/switch-dark.png"><img src="docs/img/switch.png" alt="Switch card for a Cisco Catalyst C9200CX over LLDP with Details open: model, revisions, civic location" width="380"></picture>
+<picture><source media="(prefers-color-scheme: dark)" srcset="docs/img/network-dark.png"><img src="docs/img/network.png" alt="Network card: DHCP lease, gateway, internet and DNS checks, DHCP details" width="380"></picture>
+</p>
+<p>
+<picture><source media="(prefers-color-scheme: dark)" srcset="docs/img/protocols-dark.png"><img src="docs/img/protocols.png" alt="Spanning tree card: MSTP role and state, root bridge, MST region, timers" width="380"></picture>
+<picture><source media="(prefers-color-scheme: dark)" srcset="docs/img/av-dark.png"><img src="docs/img/av.png" alt="IGMP card with the querier and PTP card with a PTPv1 master" width="380"></picture>
+<picture><source media="(prefers-color-scheme: dark)" srcset="docs/img/probes-dark.png"><img src="docs/img/probes.png" alt="Other probes card: a second tester on the same switch and a path test result" width="380"></picture>
+</p>
 
 The same page is served read-only on the port side, at the tester's DHCP
 address and as `picoplug-N.local` (N its probe number), so a tester can be

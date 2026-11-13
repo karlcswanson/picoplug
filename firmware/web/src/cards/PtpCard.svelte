@@ -4,7 +4,7 @@
   import Parts from '../lib/Parts.svelte';
   import Ln from '../lib/Ln.svelte';
   import { sg, mut } from '../lib/parts.js';
-  import { fmtDur, waiting } from '../lib/format.js';
+  import { fmtDur, waiting, ptpClass, ptpSource } from '../lib/format.js';
   let { pt, up } = $props();
 
   let w = $derived(waiting(up, 5));
@@ -20,8 +20,8 @@
       x.two_step ? 'two-step' : ''];
     const l3 = [];
     if (gm) {
-      l3.push(sg(gm.id, 'grandmaster'), 'class ' + gm.clock_class);
-      if (gm.time_source && gm.time_source !== 'unknown') l3.push(gm.time_source);
+      l3.push(sg(gm.id, 'grandmaster'), ptpClass(gm.clock_class));
+      l3.push(ptpSource(gm.time_source));
       l3.push('priority ' + gm.priority1 + '/' + gm.priority2);
       if (gm.steps_removed) l3.push(gm.steps_removed + ' hop' + (gm.steps_removed > 1 ? 's' : '') + ' away');
       if (gm.changes) l3.push('changed ' + gm.changes + '×');

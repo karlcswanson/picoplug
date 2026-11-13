@@ -285,7 +285,7 @@ def main():
         check(got == '192.168.109.1', 'multicast router row copies its address, got ' + repr(got))
         check(cdp.js("document.querySelector('#pc-mcast .sec').textContent") == "IGMP and PIM", "card title names PIM once a PIM router is heard")
         check("PTPv2 · domain 0 · UDP" in text and "sync every 125 ms" in text and "two-step" in text, "PTP row summary")
-        check("00:1d:c1:ff:fe:12:34:56" in text and "class 6" in text and "gps" in text and "1 hop away" in text, "PTP grandmaster line")
+        check("00:1d:c1:ff:fe:12:34:56" in text and "class 6 · primary reference" in text and "GNSS" in text and "1 hop away" in text, "PTP grandmaster line")
         check(tap('IGMP querier') == '192.168.109.1', 'IGMP row copies the querier address')
         check(tap('PTP v2') == '192.168.109.50', 'PTP v2 row copies the master address')
         check("PTPv1 · subdomain _DFLT" in text and "sync every 250 ms" in text, "PTP v1 row")
