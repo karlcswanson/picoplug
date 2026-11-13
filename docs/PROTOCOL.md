@@ -403,10 +403,10 @@ curl -s http://192.168.7.1/status.json | python3 -m json.tool
 
 The Switch card on the Port tab has a Share button. It opens a sheet with an optional note, and
 opens or copies a link made from the Port tab, or copies the card as text. The link comes from a URL template kept
-in flash (`form_url`, set in Setup's Share card); empty means no link, copy only. The page
+in flash (`form_url`, set in the Settings tab's Share card); empty means no link, copy only. The page
 replaces each `{name}` with the URL-encoded value from the neighbor shown on the Port tab and
 the lease. Unknown names are left as typed; a value the port does not have becomes empty. The
-read-only page on the port's own address cannot read Setup, so its link is always the default.
+read-only page on the port's own address cannot read Settings, so its link is always the default.
 
 | Fill-in | Value |
 | --- | --- |

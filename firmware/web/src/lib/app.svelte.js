@@ -6,7 +6,7 @@ import { shareParams } from './share.js';
 import { sel } from './ui.svelte.js';
 import { say } from './copy.svelte.js';
 
-export const VIEWS = ['port', 'tools', 'log', 'setup'];
+export const VIEWS = ['port', 'tools', 'log', 'settings'];
 export const app = $state({
   view: 'port', readonly: false,
   form: '', formDef: '',       // the Share link template and its default
@@ -18,6 +18,7 @@ export const app = $state({
 // tabs: hash routing, no reload; a fresh load always lands on Port
 export function route() {
   let v = (location.hash || '').slice(1);
+  if (v === 'setup') v = 'settings';   // the tab's old name, so old links still land there
   if (app.readonly || !VIEWS.includes(v)) v = 'port';
   app.view = v;
   window.scrollTo(0, 0);
@@ -40,7 +41,7 @@ export function targets() {
 }
 export function pickTarget(k) { const t = targets()[k]; app.qt = k; if (t) app.host = t; }
 
-// Share link: the Setup template with {name} fill-ins from the shown neighbor and the lease;
+// Share link: the Settings template with {name} fill-ins from the shown neighbor and the lease;
 // {share} is all of it as name=value pairs (share.js), already encoded
 export function formVals(s, cur, note) {
   const n = cur || {}, d = (s && s.port && s.port.dhcp) || {};
@@ -62,7 +63,7 @@ export function tool(q, okMsg) {
     .catch(() => { say('No reply'); });
 }
 
-// the Share link setting arrives with /settings, at start and whenever Setup saves
+// the Share link setting arrives with /settings, at start and whenever Settings saves
 export function formSet(j) {
   if (j.form_url === undefined) return;
   app.form = j.form_url; app.formDef = j.defaults ? j.defaults.form_url : '';

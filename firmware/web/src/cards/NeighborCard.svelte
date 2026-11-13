@@ -21,8 +21,8 @@
 
   let open = $derived(detail || !!ui.nb);
   let stale = $derived(!detail && isStale(n));
-  // Share: the link from Setup (the share page by default; on the read-only page, which cannot
-  // read Setup, always the share page), filled from this card
+  // Share: the link from Settings (the share page by default; on the read-only page, which cannot
+  // read Settings, always the share page), filled from this card
   let shareOn = $derived(!detail && !n.picoplug);
   let shareTpl = $derived(!shareOn ? '' : app.readonly ? SHARE_PAGE : app.form);
   const shareLink = note => shareTpl ? formFill(shareTpl, formVals(conn.status, n, note)) : '';

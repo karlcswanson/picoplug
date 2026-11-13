@@ -1,4 +1,4 @@
-/* Field-instrument theme. Light default for sunlight, dark follows the OS unless Setup overrides it. */
+/* Field-instrument theme. Light default for sunlight, dark follows the OS unless Settings overrides it. */
 :root {
   --bg: #ebeae4;
   --card: #fff;

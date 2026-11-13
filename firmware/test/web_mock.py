@@ -85,7 +85,7 @@ def main():
                 body = open(os.path.join(WEB, "manifest.json"), "rb").read()
                 ctype = "application/manifest+json"
             elif path == "/settings":
-                # just enough for the Setup tab: remembers the probe number and the form link
+                # just enough for the Settings tab: remembers the probe number and the form link
                 q = dict(kv.split("=", 1) for kv in query.split("&") if "=" in kv)
                 if "probe" in q:
                     a.probe = int(q["probe"]) if q["probe"] else None

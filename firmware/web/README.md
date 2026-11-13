@@ -17,7 +17,7 @@ Layout:
 * `src/Header.svelte` - header band, link lights, tabs
 * `src/cards/` - one file per card: switch, Network, spanning tree, LAG,
   802.1X, IGMP/PIM, PTP, other probes, Listening, No link, Last port
-* `src/views/` - the Tools, Log and Setup tabs
+* `src/views/` - the Tools, Log and Settings tabs
 * `src/lib/` - polling (`status.svelte.js`), tab and settings state (`app.svelte.js`),
   ports visited and recent runs (`history.svelte.js`), clipboard, DHCP option decoding,
   formatting helpers, and small shared pieces (`Kv`, `Parts`/`Ln` for "a · b · c" value
