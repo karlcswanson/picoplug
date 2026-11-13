@@ -1,9 +1,8 @@
-# picoplug - pocket switch-port tester
+# picoplug
 
-A WIZnet W55RP20-EVB-Pico (RP2040 + W5500, about $10) that plugs into a
-switch port and tells you, on your phone, what that port is. No app, no
-account, no extra hardware: the board appears over USB-C as a network
-adapter and serves one web page at http://192.168.7.1/ (picoplug.local).
+$12 Pocket network tool
+
+Picoplug turns a $12 WIZnet development board into a pocket network tool. The picoplug shows up as a USB Ethernet adaptor and hosts an application with various network diagnostic tools.
 
 <p>
 <picture><source media="(prefers-color-scheme: dark)" srcset="docs/img/port-dark.png"><img src="docs/img/port.png" alt="Port tab: the switch and port the tester is on, with PVID, voice VLAN and the network checks" width="260"></picture>
@@ -11,49 +10,129 @@ adapter and serves one web page at http://192.168.7.1/ (picoplug.local).
 <picture><source media="(prefers-color-scheme: dark)" srcset="docs/img/setup-dark.png"><img src="docs/img/setup.png" alt="Settings tab: probe number, LLDP and CDP advertising, appearance and the device" width="260"></picture>
 </p>
 
-What the page answers:
+## Hardware
 
-* **Which switch and port am I on?** LLDP and CDP neighbor: switch name,
-  port, port description, PVID, VLAN names, voice VLAN, management IP,
-  PoE budget, chassis, capabilities, LAG state.
-* **Does the port work?** DHCP lease with every option the server sent,
-  gateway / internet / DNS checks, spanning-tree role, state and root
-  bridge from the port's BPDUs, passive 802.1X detection.
-* **Is the AV network behind it healthy?** IGMP querier (version, who it
-  is), PIM multicast router, PTP v1 and v2 (domain, transport)
-  masters and grandmaster, shown in their own card when the port carries
-  any of it.
-* **Tools:** ping with a live RTT plot, traceroute, and a port blinker
-  that flaps the link so the switch LED shows you the port.
-* **Other probes:** testers on the same network find each other with
-  mDNS (no DHCP needed: they talk over IPv6 link-local), show which
-  switch and port each other one is on and its PVID, and tap View to read
-  another tester's whole page from your phone through the one you hold.
-* **History** of every port visited, kept in the browser, exportable as CSV.
-* **Share:** a Share button that links the port to the picoplug share
-  page, which shows it to whoever opens the link, or copies it as text.
-  The link can point at your own web form instead (a NOC request form, a
-  ticket) with the switch, port and VLAN filled in.
+Picoplug runs on WIZnet's [W55RP20-EVB-Pico](https://wiznet.io/products/evaluation-boards/w55rp20-evb-pico) board. This  $12 development board is available through electronic component distributers like DigiKey and Mouser. The board hosts a [W55RP20](https://wiznet.io/products/mcu-chips/w55rp20), this SiP includes a RP2040 microcontroller and W5500 Ethernet controller into a tiny 8mm x 8mm package. Files for printing the case are included in the project.
+
+## Make your own picoplug
+
+1. **Purchase a W55RP20-EVB-Pico:** [DigiKey](https://www.digikey.com/en/products/detail/wiznet/W55RP20-EVB-PICO/24717058), [Mouser](https://www.mouser.com/en/ProductDetail/WIZnet/W55RP20-EVB-Pico?qs=IKkN%2F947nfCQ%252BaR4QuygXA%3D%3D)
+2. **Download the firmware:** [latest release](https://github.com/karlcswanson/picoplug/releases/latest)
+3. **Flash the firmware:** Hold down the BOOTSEL button when plugging the board into the computer. Once the `RPI-RP2` volume appears, drag on the `-w55rp20.uf2` firmware file.
+4. **Plug it into your phone:** The picoplug is accessible at http://192.168.7.1 or http://picoplug.local. The IP address can be changed in the Setup tab.
+
+On Android, turn Wi-Fi off while using the tester: with Wi-Fi on, Android
+sends the browser over Wi-Fi and the page at 192.168.7.1 can't be reached.
+
+## Features
 
 <p>
 <picture><source media="(prefers-color-scheme: dark)" srcset="docs/img/switch-dark.png"><img src="docs/img/switch.png" alt="Switch card for a Cisco Catalyst C9200CX over LLDP with Details open: model, revisions, civic location" width="380"></picture>
 <picture><source media="(prefers-color-scheme: dark)" srcset="docs/img/network-dark.png"><img src="docs/img/network.png" alt="Network card: DHCP lease, gateway, internet and DNS checks, DHCP details" width="380"></picture>
 </p>
+
+### LLDP & CDP
+- Switch management info: MAC and IP
+- Port-level info like VLANs and port descriptions
+- Switch software versions and serial numbers
+
+### Network
+- DHCP
+- DNS
+- Internet
+- Ping
+
+### Spanning tree
+- STP, RSTP or MSTP, with port role and state
+- Root bridge priority and MAC
+- MST region and revision
+- Timer and BPDU intervals
+
+### LAG
+- LACP from the switch: forwarding or not
+- Active or passive, key and port
+
+### 802.1X
+- Display when port asks for authentication
+- Authenticator MAC and request frequency
+
+### IGMP
+- IGMP querier: address, version and interval
+
+### PTP
+- PTPv1 and PTPv2 masters
+- Grandmaster, domain, or subdomain
+- Transport and sync interval
+
 <p>
 <picture><source media="(prefers-color-scheme: dark)" srcset="docs/img/protocols-dark.png"><img src="docs/img/protocols.png" alt="Spanning tree card: MSTP role and state, root bridge, MST region, timers" width="380"></picture>
 <picture><source media="(prefers-color-scheme: dark)" srcset="docs/img/av-dark.png"><img src="docs/img/av.png" alt="IGMP card with the querier and PTP card with a PTPv1 master" width="380"></picture>
-<picture><source media="(prefers-color-scheme: dark)" srcset="docs/img/probes-dark.png"><img src="docs/img/probes.png" alt="Other probes card: a second tester on the same switch and a path test result" width="380"></picture>
 </p>
 
-The same page is served read-only on the port side, at the tester's DHCP
-address and as `picoplug-N.local` (N its probe number), so a tester can be
-left on a far port with USB power and read from a laptop on the network,
-or from another tester. The page gets every change pushed over a WebSocket (`/ws`),
-so it updates as the tester hears things. A raw NDJSON status stream is on
-TCP :9000 (USB side) for scripts.
+### Picoplug remote
+- Click to inspect remote picoplugs
+- Testers discover each other via mDNS
 
-On Android, turn Wi-Fi off while using the tester: with Wi-Fi on, Android
-sends the browser over Wi-Fi and the page at 192.168.7.1 can't be reached.
+<picture><source media="(prefers-color-scheme: dark)" srcset="docs/img/probes-dark.png"><img src="docs/img/probes.png" alt="Other probes card: a second tester on the same switch and a path test result" width="380"></picture>
+
+### LLDP/CDP advertisement
+- Discoverable via switch and other network tools
+
+```
+clockclub-sw01>sh lldp nei
+Device ID     Local Intf
+picoplug-2    Gi1/0/9
+```
+
+## Tools, Port Log, and Settings
+
+### Tools
+- Ping
+- Traceroute
+- Blink port
+
+### Port Log
+- Every port visited, kept in the phone's browser
+- A note per port
+- CSV export
+
+### Settings
+- Probe number
+- LLDP and CDP advertising
+- Light or dark
+- Port-check targets, the USB address and the Share link
+
+## From the network side
+
+The picoplug webpage is served read-only and is available at `picoplug-N.local`. A remote tester with USB power can be accessed from across the network at its IP or picoplug-n.local.
+
+## picoplug vs. testers that cost more than $12
+
+| | LinkRunner 10G | Pockethernet 2 | netool.io | picoplug |
+|---|:-:|:-:|:-:|:-:|
+| **Price** | **$5,675** | **$275** | **$299** | **$12** |
+| Costs $12 | - | - | - | ✓ |
+| Gigabit | ✓ | ✓ | ✓ | - |
+| Multi-gig/10G | ✓ | - | - | - |
+| SFP+ transceiver support | ✓ | - | - | - |
+| Wire map | ✓ | ✓ | - | - |
+| Cable length and fault finding (TDR) | ✓ | ✓ | - | - |
+| Tone generator for tracing cable | ✓ | ✓ | - | - |
+| Test PoE | ✓ | ✓ | - | - |
+| Built-in display | ✓ | - | - | - |
+| Battery powered | ✓ | ✓ | ✓ | - |
+| Report generation | ✓ | ✓ | - | - |
+| Product support | ✓ | ✓ | ✓ | - |
+| LLDP and CDP | ✓ | ✓ | ✓ | ✓ |
+| DHCP | ✓ | ✓ | ✓ | ✓ |
+| Ping | ✓ | ✓ | ✓ | ✓ |
+| Blink remote switch port | ✓ | ✓ | ✓ | ✓ |
+
+## How it works
+
+The page gets every change pushed over a WebSocket (`/ws`), so it updates
+as the tester hears things. A raw NDJSON status stream is on TCP :9000
+(USB side) for scripts.
 
 ```
 Switch --Ethernet--> W5500 (MACRAW) --SPI--> RP2040 --USB NCM--> phone / laptop browser
