@@ -1,7 +1,7 @@
 // The Share link: what the Port tab shows, as name=value pairs. The default link puts them
 // after the '#' of the picoplug share page (clockclub.net/apps/picoplug/), where a browser keeps
 // them: the web server never sees the switch, port or addresses. The same pairs fill {share} in
-// any link set in Setup. Field list: docs/PROTOCOL.md, "Share link".
+// any link set in Settings. Field list: docs/PROTOCOL.md, "Share link".
 import { stripKind, portName, isP } from './format.js';
 
 export const SHARE_PAGE = 'https://clockclub.net/apps/picoplug/#{share}';

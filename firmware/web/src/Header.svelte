@@ -6,7 +6,7 @@
   import { portName, isStale, fmtDur } from './lib/format.js';
   import { app } from './lib/app.svelte.js';
   import { closeRemote } from './lib/status.svelte.js';
-  const TABS = [['port', 'port', 'Port'], ['tools', 'ping', 'Tools'], ['log', 'log', 'Log'], ['setup', 'sliders', 'Setup']];
+  const TABS = [['port', 'port', 'Port'], ['tools', 'ping', 'Tools'], ['log', 'log', 'Log'], ['settings', 'sliders', 'Settings']];
 
   let { s, cur, neighbors, offline, lastOk, fails, remote = null } = $props();
 

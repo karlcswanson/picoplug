@@ -8,7 +8,7 @@ adapter and serves one web page at http://192.168.7.1/ (picoplug.local).
 <p>
 <picture><source media="(prefers-color-scheme: dark)" srcset="docs/img/port-dark.png"><img src="docs/img/port.png" alt="Port tab: the switch and port the tester is on, with PVID, voice VLAN and the network checks" width="260"></picture>
 <picture><source media="(prefers-color-scheme: dark)" srcset="docs/img/tools-dark.png"><img src="docs/img/tools.png" alt="Tools tab: ping with a round-trip plot" width="260"></picture>
-<picture><source media="(prefers-color-scheme: dark)" srcset="docs/img/setup-dark.png"><img src="docs/img/setup.png" alt="Setup tab" width="260"></picture>
+<picture><source media="(prefers-color-scheme: dark)" srcset="docs/img/setup-dark.png"><img src="docs/img/setup.png" alt="Settings tab: probe number, LLDP and CDP advertising, appearance and the device" width="260"></picture>
 </p>
 
 What the page answers:

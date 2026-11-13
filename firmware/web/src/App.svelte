@@ -16,7 +16,7 @@
   import PeerCard from './cards/PeerCard.svelte';
   import Tools from './views/Tools.svelte';
   import Log from './views/Log.svelte';
-  import Setup from './views/Setup.svelte';
+  import Settings from './views/Settings.svelte';
   import { conn, start, remote, scanPeers } from './lib/status.svelte.js';
   import { sel } from './lib/ui.svelte.js';
   import { toast } from './lib/copy.svelte.js';
@@ -121,7 +121,7 @@
   {:else if app.view === 'log'}
     <section><Log/></section>
   {:else}
-    <section><Setup/></section>
+    <section><Settings/></section>
   {/if}
 </main>
 <div class="toast" class:on={toast.on} role="status">{toast.msg}</div>

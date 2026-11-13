@@ -193,7 +193,10 @@ def main():
         check(cdp.js("document.getElementById('t_host').value") == "192.168.109.1", "host defaults to the gateway")
         click_text(".qt button", "Internet")
         check(cdp.js("document.getElementById('t_host').value") == "1.1.1.1", "Internet quick target fills the host")
+        view("settings")
+        check(cdp.js("document.querySelector('nav.tabs a.on')?.textContent.trim()") == "Settings", "the last tab is called Settings")
         view("setup")
+        check(cdp.js("document.querySelector('nav.tabs a.on')?.textContent.trim()") == "Settings", "an old #setup link opens Settings")
         click_text(".seg button", "Dark")
         check(cdp.js("document.documentElement.dataset.theme") == "dark", "Dark sets data-theme on html")
         click_text(".seg button", "Auto")
@@ -346,7 +349,7 @@ def main():
             check(sw <= 375, f"case {i}: no horizontal overflow at 375 px (scrollWidth {sw})")
         cdp.call("Emulation.clearDeviceMetricsOverride")
 
-        # --- Share: a button on the Port tab opens a sheet; its link is the Setup template filled from the card
+        # --- Share: a button on the Port tab opens a sheet; its link is the Settings template filled from the card
         sharebtn = "document.querySelector('.card.nb button.share')"
         def sheet():
             """open the Share sheet, return its link, target and items, close it"""
@@ -369,14 +372,14 @@ def main():
         cdp.js("document.querySelector('dialog.sheet').close();1"); time.sleep(0.3)
         check(urllib.parse.parse_qs(href.partition("#")[2]).get("note") == ["under the stage, A12"], "the sheet's note rides along in the link: " + href)
         formcard = "[...document.querySelectorAll('.card')].find(c=>c.querySelector('#s_form'))"
-        view("setup", 0.8)
+        view("settings", 0.8)
         cdp.js("{const f=document.getElementById('s_form');f.value='https://nf.example.net/noc/?requestType=Switch&switchIp={switch_ip}&port={port}';f.dispatchEvent(new Event('input'))}"); time.sleep(0.3)
-        check("port=mgi6" in cdp.js(formcard + ".innerText"), "Setup previews the filled-in link")
+        check("port=mgi6" in cdp.js(formcard + ".innerText"), "Settings previews the filled-in link")
         cdp.js(formcard + ".querySelector('button.p').click()"); time.sleep(0.8)
         view("port", 2.5)
         href = sheet().get("href") or ""
         check(href.startswith("https://nf.example.net/noc/?requestType=Switch&switchIp=") and href.endswith("&port=mgi6"), "saved link drives the sheet: " + href)
-        view("setup", 0.8)
+        view("settings", 0.8)
         cdp.js("{const f=document.getElementById('s_form');f.value='';f.dispatchEvent(new Event('input'))}"); time.sleep(0.3)
         cdp.js(formcard + ".querySelector('button.p').click()"); time.sleep(0.8)
         view("port", 2.5)
@@ -407,8 +410,8 @@ def main():
         check(hstat() == "No switch · picoplug-3", "header does not name the picoplug as the switch port")
         check(not cdp.js("!!" + sharebtn), "no Share button for a picoplug neighbor")
         check(not any(e.get("sys_name") == "picoplug-3" for e in json.loads(cdp.js("localStorage.getItem('piccolldp.history.v1')") or "[]")), "picoplug neighbor kept out of the port log")
-        view("setup")
-        check("no CDP switch" in cdp.js("document.body.innerText"), "Setup says no CDP switch heard")
+        view("settings")
+        check("no CDP switch" in cdp.js("document.body.innerText"), "Settings says no CDP switch heard")
         view("port", 0.3)
 
         # --- case 13: fields checked against Wireshark/tcpdump: 802.3bt PoE, mgmt VLAN, protocols, EEE, location, MUD URL
