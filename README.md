@@ -12,17 +12,14 @@ Picoplug turns a $12 WIZnet development board into a pocket network tool. The pi
 
 ## Hardware
 
-Picoplug runs on WIZnet's [W55RP20-EVB-Pico](https://wiznet.io/products/evaluation-boards/w55rp20-evb-pico) board. This  $12 development board is available through electronic component distributers like DigiKey and Mouser. The board hosts a [W55RP20](https://wiznet.io/products/mcu-chips/w55rp20), this SiP includes a RP2040 microcontroller and W5500 Ethernet controller into a tiny 8mm x 8mm package. Files for printing the case are included in the project.
+Picoplug runs on WIZnet's [W55RP20-EVB-Pico](https://wiznet.io/products/evaluation-boards/w55rp20-evb-pico) board. This  $12 development board is available through electronic component distributers like DigiKey and Mouser. The board hosts a [W55RP20](https://wiznet.io/products/mcu-chips/w55rp20), this SiP includes a RP2040 microcontroller and W5500 Ethernet controller into a tiny 8mm x 8mm package. Picoplug boots within seconds and is powered by the phone. Files for printing the case are included in the project.
 
 ## Make your own picoplug
 
 1. **Purchase a W55RP20-EVB-Pico:** [DigiKey](https://www.digikey.com/en/products/detail/wiznet/W55RP20-EVB-PICO/24717058), [Mouser](https://www.mouser.com/en/ProductDetail/WIZnet/W55RP20-EVB-Pico?qs=IKkN%2F947nfCQ%252BaR4QuygXA%3D%3D)
 2. **Download the firmware:** [latest release](https://github.com/karlcswanson/picoplug/releases/latest)
 3. **Flash the firmware:** Hold down the BOOTSEL button when plugging the board into the computer. Once the `RPI-RP2` volume appears, drag on the `-w55rp20.uf2` firmware file.
-4. **Plug it into your phone:** The picoplug is accessible at http://192.168.7.1 or http://picoplug.local. The IP address can be changed in the Setup tab.
-
-On Android, turn Wi-Fi off while using the tester: with Wi-Fi on, Android
-sends the browser over Wi-Fi and the page at 192.168.7.1 can't be reached.
+4. **Plug it into your phone:** The picoplug is accessible at http://192.168.7.1 or http://picoplug.local. The IP address can be changed in the Settings tab. Android and iOS devices handle network routes slightly differently. For use on Android devices, Airplane mode may need to be enabled to access the picoplug.
 
 ## Features
 
