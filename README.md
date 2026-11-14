@@ -141,6 +141,7 @@ Switch --Ethernet--> W5500 (MACRAW) --SPI--> RP2040 --USB NCM--> phone / laptop 
 * `firmware/test/` - host-side unit tests and a headless-Chrome smoke test of the page
 * `docs/PROTOCOL.md` - JSON schema of `/status.json` and the :9000 stream, HTTP endpoints
 * `THIRD_PARTY_LICENSES.md` - notices for the bundled Pico SDK, lwIP, TinyUSB, WIZnet ioLibrary, Svelte and Lucide icons
+* `CLAUDE.md` - notes for working on the code (with or without an AI assistant)
 
 ## Build
 

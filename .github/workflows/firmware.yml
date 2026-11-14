@@ -88,6 +88,7 @@ jobs:
           mkdir -p out
           cp build/picolldp.uf2 "out/$name.uf2"
           (cd out && sha256sum "$name.uf2" > "$name.uf2.sha256")
+          cp THIRD_PARTY_LICENSES.md out/
           echo "version=$v" >> "$GITHUB_OUTPUT"
           echo "tag=$tag" >> "$GITHUB_OUTPUT"
           echo "pre=$pre" >> "$GITHUB_OUTPUT"
