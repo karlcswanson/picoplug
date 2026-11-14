@@ -1,9 +1,9 @@
 # Third-party licenses
 
-picolldp's firmware image and its web page include code and artwork from
+picoplug's firmware image and its web page include code and artwork from
 the projects below. Each keeps its own license; the notices are
 reproduced here as those licenses require, for source and for binary
-(UF2) distributions.
+(UF2) distributions. Each release attaches this file next to the `.uf2`.
 
 | Component | Where it is used | License |
 |---|---|---|
@@ -11,8 +11,8 @@ reproduced here as those licenses require, for source and for binary
 | Lucide icons 0.460.0 (portions from Feather) | SVG icon sprite in the viewer page (`firmware/web/src/lib/sprite.svg`) | ISC (Feather portions MIT) |
 | Raspberry Pi Pico SDK 2.3.1 | firmware runtime, drivers, build | BSD 3-Clause |
 | lwIP 2.2 (bundled with the Pico SDK) | TCP/IP stack on the USB and Ethernet sides | BSD 3-Clause |
-| TinyUSB 0.18 (bundled with the Pico SDK) | USB device stack, CDC-NCM | MIT |
-| WIZnet ioLibrary_Driver 3.2.0 | W5500 register access | BSD 3-Clause |
+| TinyUSB 0.18 (bundled with the Pico SDK) | USB device stack; CDC-NCM from a modified copy in `firmware/src/tusb_ncm_device.c` | MIT |
+| WIZnet ioLibrary_Driver 3.2.0 | W5500 register access | MIT |
 
 ## Svelte
 

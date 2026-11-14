@@ -7,6 +7,7 @@ hc-profile-*/
 .DS_Store
 .env
 __pycache__/
+CLAUDE.local.md
 
 # private planning docs and notes
 ref/
