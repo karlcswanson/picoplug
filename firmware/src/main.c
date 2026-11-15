@@ -1,7 +1,7 @@
 /*
  * main.c - picolldp firmware entry point.
  *
- * Single-threaded main loop, no RTOS:
+ * Single-threaded main loop, no RTOS: main() is app_init() then app_loop_once() forever.
  *   tud_task -> usb_net_poll (lwIP) -> W5500 poll -> LLDP parse -> neighbor table
  *   -> api_server_poll (NDJSON :9000). HTTP :80 is callback driven.
  */
@@ -195,7 +195,14 @@ static void on_frame(const uint8_t *frame, size_t len, void *ctx)
     app_handle_frame(frame, len);
 }
 
-int main(void)
+/* The main loop's own state (app_init sets it, app_loop_once uses it). */
+static absolute_time_t next_w5500_retry, next_status, next_blink, next_link_check;
+static w5500_link_t last_link;
+static bool led;
+#define STEP(n) (watchdog_hw->scratch[2] = (n))
+
+/* Everything up to the main loop: settings, MACs, both network sides, every server, then USB. */
+void app_init(void)
 {
     stdio_init_all();
     sleep_ms(100);
@@ -239,14 +246,13 @@ int main(void)
         printf("main: previous boot ended in watchdog reset (%lu so far), last loop step %lu\n",
                (unsigned long)watchdog_hw->scratch[0], (unsigned long)watchdog_hw->scratch[2]);
     }
-#define STEP(n) (watchdog_hw->scratch[2] = (n))
     g_wd_resets = watchdog_hw->scratch[0];
     fault_report_previous();
     watchdog_enable(WATCHDOG_TIMEOUT_MS, true);
 
     /* Ethernet side. A missing/unresponsive W5500 must not block USB, so a
      * failed init is retried from the main loop instead of spinning here. */
-    absolute_time_t next_w5500_retry = make_timeout_time_ms(1000);
+    next_w5500_retry = make_timeout_time_ms(1000);
     if (!w5500_init(eth_mac)) printf("main: W5500 init failed, will retry\n");
 
     /* USB side. Order is deliberate: lwIP and every service that must be
@@ -266,87 +272,94 @@ int main(void)
     printf("main: usb device enabled (%s%s)\n", USB_NET_USE_ECM ? "CDC-ECM" : "CDC-NCM",
            USB_DEBUG_CDC ? " + CDC debug serial" : "");
 
-    absolute_time_t next_status = make_timeout_time_ms(5000);
-    absolute_time_t next_blink = make_timeout_time_ms(500);
-    absolute_time_t next_link_check = make_timeout_time_ms(500);
-    w5500_link_t last_link = {0};
-    bool led = false;
+    next_status = make_timeout_time_ms(5000);
+    next_blink = make_timeout_time_ms(500);
+    next_link_check = make_timeout_time_ms(500);
+}
 
-    while (true) {
-        watchdog_update();
+/* One pass of the main loop. Never blocks for long: main() calls it forever, and a build that cannot
+ * own the loop (one running in a browser, say) calls it from a timer. */
+void app_loop_once(void)
+{
+    watchdog_update();
 
-        STEP(1); tud_task();
-        STEP(2); usb_net_poll();
+    STEP(1); tud_task();
+    STEP(2); usb_net_poll();
 
-        if (w5500_ready()) {
-            STEP(3); w5500_poll(on_frame, NULL);
-        } else if (time_reached(next_w5500_retry)) {
-            next_w5500_retry = make_timeout_time_ms(1000);
-            STEP(4); w5500_init(eth_mac);
-        }
-
-        if (neighbor_table_expire(now_ms()))
-            printf("lldp: neighbor expired (%d in table)\n", neighbor_table_count());
-
-        /* The port blinker drops the link on purpose; link tracking stays frozen until it is done. */
-        if (time_reached(next_link_check) && !blink_active()) {
-            STEP(5);
-            next_link_check = make_timeout_time_ms(500);
-            w5500_link_t l;
-            w5500_get_link(&l);
-            if (l.link && !g_link_up_ms) { g_link_up_ms = now_ms() ? now_ms() : 1; stp_state_reset(&g_stp); eapol_state_reset(&g_dot1x); lacp_state_reset(&g_lacp); mcast_reset(); }
-            else if (!l.link && g_link_up_ms) {
-                g_link_up_ms = 0;
-                stp_state_reset(&g_stp);
-                eapol_state_reset(&g_dot1x);
-                lacp_state_reset(&g_lacp);
-                mcast_reset();
-                int dropped = neighbor_table_clear();
-                if (dropped) printf("lldp: link down, dropped %d neighbor%s\n", dropped, dropped == 1 ? "" : "s");
-            }
-            eth_net_set_link(l.link);
-            remote_link_changed(l.link);
-        }
-        STEP(6); blink_poll(); remote_poll();
-        STEP(7); eth_net_poll();
-        STEP(8); advertise_poll();
-        STEP(9); probe_poll();
-        STEP(10); tool_poll();
-        STEP(11); api_server_poll();
-        STEP(12); http_server_poll();
-        STEP(13);
-
-        if (time_reached(next_blink)) {
-            next_blink = make_timeout_time_ms(neighbor_table_count() ? 100 : 500);
-            led = !led;
-#ifdef STATUS_LED_PIN
-            gpio_put(STATUS_LED_PIN, led);
-#endif
-        }
-
-        if (time_reached(next_status)) {
-            next_status = make_timeout_time_ms(5000);
-            w5500_link_t l;
-            w5500_get_link(&l);
-            if (memcmp(&l, &last_link, sizeof l) != 0) {
-                last_link = l;
-                if (l.link) printf("eth: link up, %u Mbit/s %s duplex\n", l.speed, l.full ? "full" : "half");
-                else printf("eth: link down\n");
-            }
-            extern uint32_t g_last_fault_pc, g_last_fault_lr;
-            if (g_last_fault_pc) printf("main: NOTE previous boot hard faulted at pc=0x%08lx lr=0x%08lx\n",
-                                        (unsigned long)g_last_fault_pc, (unsigned long)g_last_fault_lr);
-            const w5500_stats_t *s = w5500_stats();
-            const usb_net_stats_t *u = usb_net_stats();
-            printf("main: up %lu s, eth rx %lu tx %lu/%lu fail (oversize %lu, resyncs %lu), neighbors %d, "
-                   "usb %s rx %lu tx %lu drop %lu/%lu reenum %lu, dhcp leases %lu, api clients %d\n",
-                   (unsigned long)(now_ms() / 1000), (unsigned long)s->frames,
-                   (unsigned long)s->tx_frames, (unsigned long)s->tx_fail,
-                   (unsigned long)s->oversize, (unsigned long)s->resyncs, neighbor_table_count(),
-                   usb_net_mounted() ? "up" : "down", (unsigned long)u->rx_frames,
-                   (unsigned long)u->tx_frames, (unsigned long)u->rx_dropped,
-                   (unsigned long)u->tx_dropped, (unsigned long)u->reenums, (unsigned long)dhcpd_leases_granted(),
-                   api_server_clients());
-        }
+    if (w5500_ready()) {
+        STEP(3); w5500_poll(on_frame, NULL);
+    } else if (time_reached(next_w5500_retry)) {
+        next_w5500_retry = make_timeout_time_ms(1000);
+        STEP(4); w5500_init(eth_mac);
     }
+
+    if (neighbor_table_expire(now_ms()))
+        printf("lldp: neighbor expired (%d in table)\n", neighbor_table_count());
+
+    /* The port blinker drops the link on purpose; link tracking stays frozen until it is done. */
+    if (time_reached(next_link_check) && !blink_active()) {
+        STEP(5);
+        next_link_check = make_timeout_time_ms(500);
+        w5500_link_t l;
+        w5500_get_link(&l);
+        if (l.link && !g_link_up_ms) { g_link_up_ms = now_ms() ? now_ms() : 1; stp_state_reset(&g_stp); eapol_state_reset(&g_dot1x); lacp_state_reset(&g_lacp); mcast_reset(); }
+        else if (!l.link && g_link_up_ms) {
+            g_link_up_ms = 0;
+            stp_state_reset(&g_stp);
+            eapol_state_reset(&g_dot1x);
+            lacp_state_reset(&g_lacp);
+            mcast_reset();
+            int dropped = neighbor_table_clear();
+            if (dropped) printf("lldp: link down, dropped %d neighbor%s\n", dropped, dropped == 1 ? "" : "s");
+        }
+        eth_net_set_link(l.link);
+        remote_link_changed(l.link);
+    }
+    STEP(6); blink_poll(); remote_poll();
+    STEP(7); eth_net_poll();
+    STEP(8); advertise_poll();
+    STEP(9); probe_poll();
+    STEP(10); tool_poll();
+    STEP(11); api_server_poll();
+    STEP(12); http_server_poll();
+    STEP(13);
+
+    if (time_reached(next_blink)) {
+        next_blink = make_timeout_time_ms(neighbor_table_count() ? 100 : 500);
+        led = !led;
+#ifdef STATUS_LED_PIN
+        gpio_put(STATUS_LED_PIN, led);
+#endif
+    }
+
+    if (time_reached(next_status)) {
+        next_status = make_timeout_time_ms(5000);
+        w5500_link_t l;
+        w5500_get_link(&l);
+        if (memcmp(&l, &last_link, sizeof l) != 0) {
+            last_link = l;
+            if (l.link) printf("eth: link up, %u Mbit/s %s duplex\n", l.speed, l.full ? "full" : "half");
+            else printf("eth: link down\n");
+        }
+        extern uint32_t g_last_fault_pc, g_last_fault_lr;
+        if (g_last_fault_pc) printf("main: NOTE previous boot hard faulted at pc=0x%08lx lr=0x%08lx\n",
+                                    (unsigned long)g_last_fault_pc, (unsigned long)g_last_fault_lr);
+        const w5500_stats_t *s = w5500_stats();
+        const usb_net_stats_t *u = usb_net_stats();
+        printf("main: up %lu s, eth rx %lu tx %lu/%lu fail (oversize %lu, resyncs %lu), neighbors %d, "
+               "usb %s rx %lu tx %lu drop %lu/%lu reenum %lu, dhcp leases %lu, api clients %d\n",
+               (unsigned long)(now_ms() / 1000), (unsigned long)s->frames,
+               (unsigned long)s->tx_frames, (unsigned long)s->tx_fail,
+               (unsigned long)s->oversize, (unsigned long)s->resyncs, neighbor_table_count(),
+               usb_net_mounted() ? "up" : "down", (unsigned long)u->rx_frames,
+               (unsigned long)u->tx_frames, (unsigned long)u->rx_dropped,
+               (unsigned long)u->tx_dropped, (unsigned long)u->reenums, (unsigned long)dhcpd_leases_granted(),
+               api_server_clients());
+    }
+}
+
+int main(void)
+{
+    app_init();
+    while (true) app_loop_once();
 }

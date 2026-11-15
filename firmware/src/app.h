@@ -11,6 +11,11 @@
 #include "mcast.h"
 #include "lacp.h"
 
+/* main() is app_init() once, then app_loop_once() forever. They are separate so that a build which cannot
+ * own the loop can drive the same code from a timer. */
+void app_init(void);
+void app_loop_once(void);
+
 /* Every received Ethernet frame (W5500 poll or POST /inject). */
 void app_handle_frame(const uint8_t *frame, size_t len);
 
