@@ -138,3 +138,7 @@
     <span class="meta">{m.fmsg}</span>
   </div>
 </div>
+<div class="foot">
+  <span>© 2026 Karl Swanson</span>
+  <a href="https://github.com/karlcswanson/picoplug" target="_blank" rel="noopener">GitHub<svg class="ext" viewBox="0 0 10 10" aria-hidden="true"><path d="M1.6 8.4 8.2 1.8M3 1.8h5.2V7"/></svg></a>
+</div>

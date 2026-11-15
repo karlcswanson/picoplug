@@ -210,8 +210,8 @@ def main():
         cdp.js("document.querySelector('.card.nb .disc').click()")
         time.sleep(0.3)
         check("chassis" in cdp.js("document.body.innerText").lower(), "neighbor Details expands (innerText follows CSS text-transform, so compare lowercased)")
-        check(len(cdp.js("Array.from(document.querySelectorAll('*')).filter(e=>/\\p{Extended_Pictographic}/u.test(e.textContent||'')).length ? ['x'] : []")) == 0,
-              "no emoji characters on the page")
+        check(len(cdp.js("Array.from(document.querySelectorAll('*')).filter(e=>/\\p{Extended_Pictographic}/u.test((e.textContent||'').replace(/\u00a9/g,''))).length ? ['x'] : []")) == 0,
+              "no emoji characters on the page (the copyright sign in the Settings footer is text, and allowed)")
 
         # tap-to-copy: every value row copies; identifier rows copy just the identifier
         cdp.js("[...document.querySelectorAll('a.chk')].find(a=>a.textContent.includes('Gateway')).click()"); time.sleep(0.6)
