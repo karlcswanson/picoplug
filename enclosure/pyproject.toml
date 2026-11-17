@@ -1,0 +1,14 @@
+[project]
+name = "picoplug-enclosure"
+version = "0.1.0"
+description = "CadQuery sources and renders for the picoplug cases"
+requires-python = ">=3.10,<3.13"
+dependencies = [
+    "cadquery>=2.5",
+    "matplotlib>=3.8",
+    "numpy",
+    "usd-core>=26.8",
+]
+
+[tool.uv]
+package = false
