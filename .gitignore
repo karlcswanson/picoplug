@@ -7,6 +7,9 @@ hc-profile-*/
 .DS_Store
 .env
 __pycache__/
+# case: the uv environment, and the USDZ previews (they contain WIZnet's board model)
+enclosure/.venv/
+enclosure/**/*.usdz
 CLAUDE.local.md
 
 # private planning docs and notes
