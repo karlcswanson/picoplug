@@ -7,7 +7,6 @@ tunable are in the README next to each case.
 | Folder | What |
 |---|---|
 | `enclosure/evb-snapframe/` | The two-piece printed snap case. [README](../enclosure/evb-snapframe/README.md) |
-| `enclosure/evb-shrink/` | The no-printer option: clear heat shrink. [README](../enclosure/evb-shrink/README.md) |
 | `enclosure/evb-sandwich/` | Base geometry the snap case builds on, and the board model loader. |
 | `enclosure/evb-fdm/` | Shared board dimensions. |
 
@@ -64,13 +63,6 @@ From `enclosure/evb-snapframe`, after generating the case:
 uv run render_snapframe.py                                  # docs/img/evb_snapframe_sheet.png
 uv run render_bed.py                                        # docs/img/evb_snapframe_bed.png
 uv run render_frosted.py path/to/W55RP20-EVB-Pico_V100.step # docs/img/evb_snapframe_frosted.png
-```
-
-The heat shrink fit sheet, from `enclosure/evb-shrink`:
-
-```
-uv run fit_svg.py
-rsvg-convert -o ../../docs/img/evb_shrink_fit.png evb_shrink_fit.svg
 ```
 
 ## Changing the case
