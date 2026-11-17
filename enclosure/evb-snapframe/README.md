@@ -87,12 +87,13 @@ gone.
 
 ## Files
 
-- `evb_snapframe.py`: CadQuery model, built on `../evb-sandwich` and `../evb-fdm`.
+- `evb_snapframe.py`: CadQuery model; the board's dimensions and every tunable are at the top.
   `uv run evb_snapframe.py` writes the STL and STEP files. Given WIZnet's board model
   (`W55RP20-EVB-Pico_V100.step`, from WIZnet's documentation for the board, not included
   here) as an argument, it also checks the case against the board and writes the coloured
   `evb-snapframe-assembly.usdz` and `evb-snapframe-exploded.usdz`. The STEP files stay in
   case coordinates.
+- `assembly.py`: loads WIZnet's board model and writes the USDZ previews.
 - `render_snapframe.py`: writes `docs/img/evb_snapframe_sheet.png`.
 - `render_bed.py`: writes `docs/img/evb_snapframe_bed.png`, the parts as they sit on the print bed.
 - `render_frosted.py <board.step>`: writes `docs/img/evb_snapframe_frosted.png`, the case with the board inside

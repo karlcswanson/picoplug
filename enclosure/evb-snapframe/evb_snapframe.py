@@ -1,6 +1,6 @@
-"""All-printed take on evb-sandwich for the W55RP20-EVB-Pico: same two blocks and the
-opening between them, but the plate is printed in one piece with the frame-top, with the
-project logo sunk into it, and PLA-friendly snaps replace the screws and inserts.
+"""All-printed two-piece case for the W55RP20-EVB-Pico: a block round the RJ45 and one over
+the USB-C, an opening between them under a printed plate with the project logo sunk into
+it, and PLA-friendly snaps holding the halves together.
 
 The snaps are short stiff arms in the bottom's side walls, 9 mm from root to tip, bending
 sideways. Layers run along the arm, and strain at the root is about 1.1%: fine in PLA for
@@ -13,7 +13,7 @@ and the deck are plain walls with no supports. The jack pocket's upper side wall
 long bridge left, 22 mm, and it comes out rough. The .stl files for the top are already
 rotated for that; the .step files stay in case coordinates.
 
-Run:  python evb_snapframe.py [path/to/W55RP20-EVB-Pico_V100.step]
+Run:  uv run evb_snapframe.py [path/to/W55RP20-EVB-Pico_V100.step]
 With the board STEP given it checks overlaps and writes the coloured assembly too.
 """
 import math
@@ -23,14 +23,43 @@ import sys
 import cadquery as cq
 
 HERE = os.path.dirname(os.path.abspath(__file__))
-sys.path.insert(0, os.path.join(HERE, "..", "evb-fdm"))
-sys.path.insert(0, os.path.join(HERE, "..", "evb-sandwich"))
-import evb_fdm as F  # noqa: E402
-import evb_sandwich as S  # noqa: E402
 
-S.X1 = 81.6                   # 1 mm longer than the sandwich at the USB end: the lip over the board's
-                              # end is 1.5 mm instead of 0.5, and the USB-C mouth sits 1 mm inside the face
-TOP_Z = S.UP_Z1 + F.FLOOR     # same overall height as the sandwich with its plate
+# ---- the board, in the frame of WIZnet's STEP (W55RP20-EVB-Pico_V100.step): x along the
+# board (jack face at x -4.75, USB end at 80), y across (0..21), z up with the board's top
+# face at z 0 ----
+BOARD_L, BOARD_W, BOARD_T = 80.0, 21.0, 1.62
+BOARD_HOLES = [(78.0, 3.5), (78.0, 17.5)]         # 2.0 mm
+JACK_FACE_X = -4.75
+JACK_TOP = 13.35                                  # RJ45 body: x -4.75..17.05, y 2.55..18.45
+JACK_Y0, JACK_Y1 = 2.55 - 0.25, 18.45 + 0.25      # its opening in the face, 0.25 clear
+UNDER_Z = -3.6                                    # under the board: through-hole pins reach -3.25
+TAIL_TOP = 3.6                                    # tallest part behind the jack is the USB-C, 3.31
+USB_W, USB_H = 8.94 + 0.5, 4.30 + 0.5             # USB-C receptacle: y 6.03..14.97, z -0.99..3.31
+USB_Y, USB_Z = 10.5, (-0.99 + 3.31) / 2
+LEDS = [(48.7, 51.3, 8.0, 15.4),                  # USER, ACT, DUP, SPD, LINK column
+        (60.2, 62.8, 4.6, 6.4)]                   # PWR
+
+# ---- the case ----
+FLOOR = 1.6                                       # floor and deck, 4 lines at 0.4
+CAV_X0, CAV_X1 = -0.2, BOARD_L + 0.25             # board cavity
+CAV_Y0, CAV_Y1 = -0.25, BOARD_W + 0.25
+BOSS_D = 4.8                                      # pads over and under the board's holes
+TAB_CLR = 1.2                                     # round the RJ45 cage body on top and both sides:
+POCKET_Y0, POCKET_Y1 = 2.55 - TAB_CLR, 18.45 + TAB_CLR   # its spring tabs stay inside
+FACE_LIP = 1.0                                    # front lip round the cage, 0.25 clear
+X0, X1 = JACK_FACE_X, 81.6                        # flush with the jack face; the USB-C mouth (80.6)
+                                                  # sits 1 mm inside the face
+REAR_IN = 79.4                                    # inside of the rear wall: the lip over the board's end
+Y0, Y1 = -3.5, BOARD_W + 3.5
+R = 4.0                                           # plan corner radius
+LOW_Z0 = UNDER_Z - FLOOR                          # case bottom
+UP_Z1 = JACK_TOP + TAB_CLR                        # top of the jack pocket
+DECK_Z = TAIL_TOP + FLOOR                         # deck over the board, under the opening
+FRONT_BLOCK_X1 = 22.3                             # block round the cage ends 4 mm behind the pocket
+REAR_BLOCK_X0 = 70.0                              # block over the USB-C
+EDGE_R = 1.0
+
+TOP_Z = UP_Z1 + FLOOR
 SPAN_T = 3.0                  # printed plate over the opening
 OPEN_Z1 = TOP_Z - SPAN_T
 
@@ -45,7 +74,7 @@ TAB_ROUND = 0.8               # clip tops rounded at both ends, to clear the ope
 TAB_TOP = 3.9
 
 # logo: the icon's glyph, in its 24-unit grid, sunk into the top
-LOGO_C = ((S.X0 + S.X1) / 2, F.BOARD_W / 2)
+LOGO_C = ((X0 + X1) / 2, BOARD_W / 2)
 LOGO_S, LOGO_DEPTH = 2.0, 0.6
 LOGO_LINES = [[(6.25, 8.5), (2.75, 12), (6.25, 15.5)], [(17.75, 8.5), (21.25, 12), (17.75, 15.5)]]
 LOGO_STROKE = 1.75
@@ -72,28 +101,57 @@ SHELF_X0 = 75.0
 DECK_SKIN = 0.8
 
 
+def box(x0, x1, y0, y1, z0, z1):
+    return cq.Workplane("XY").box(x1 - x0, y1 - y0, z1 - z0, centered=False).translate((x0, y0, z0))
+
+
+def cyl(xy, d, z0, z1):
+    return cq.Workplane("XY").center(*xy).circle(d / 2).extrude(z1 - z0).translate((0, 0, z0))
+
+
+def fillet(w, sel, r):
+    """Fillet, stepping the radius down if OCCT can't do it."""
+    for rr in (r, r * 0.7, r * 0.5):
+        try:
+            out = w.edges(sel).fillet(rr)
+            if out.val().isValid():
+                return out
+        except Exception:
+            pass
+    return w
+
+
+def rrect(w, h, r):
+    return cq.Sketch().rect(w, h).vertices().fillet(r)
+
+
+def outline(z0, z1):
+    return (cq.Workplane("XY", origin=((X0 + X1) / 2, (Y0 + Y1) / 2, z0))
+            .placeSketch(rrect(X1 - X0, Y1 - Y0, R)).extrude(z1 - z0))
+
+
 def ybox(x0, x1, ya, yb, z0, z1, sign):
-    y0, y1 = (ya, yb) if sign > 0 else (F.BOARD_W - yb, F.BOARD_W - ya)
-    return F.box(x0, x1, y0, y1, z0, z1)
+    y0, y1 = (ya, yb) if sign > 0 else (BOARD_W - yb, BOARD_W - ya)
+    return box(x0, x1, y0, y1, z0, z1)
 
 
 def prism(pts, x0, x1, sign):
     p = cq.Workplane("YZ").polyline(pts).close().extrude(x1 - x0).translate((x0, 0, 0))
-    return p if sign > 0 else p.mirror("XZ", (0, F.BOARD_W / 2, 0))
+    return p if sign > 0 else p.mirror("XZ", (0, BOARD_W / 2, 0))
 
 
 def snap(bottom, top, root, tip, sign):
     d = 1 if tip > root else -1
     lo, hi = min(root, tip), max(root, tip)
-    t = S.Y0 + ARM_T
-    z0 = S.LOW_Z0 - 1
+    t = Y0 + ARM_T
+    z0 = LOW_Z0 - 1
     bottom = bottom.cut(ybox(lo, hi, t, t + BACK_GAP, z0, 1, sign))
     sx0, sx1 = (tip, tip + END_SLIT) if d > 0 else (tip - END_SLIT, tip)
-    bottom = bottom.cut(ybox(sx0, sx1, S.Y0 - 1, t + BACK_GAP, z0, 1, sign))
+    bottom = bottom.cut(ybox(sx0, sx1, Y0 - 1, t + BACK_GAP, z0, 1, sign))
     tx0, tx1 = (tip - TAB_L, tip) if d > 0 else (tip, tip + TAB_L)
-    bottom = bottom.union(ybox(tx0, tx1, S.Y0, t, -0.01, TAB_TOP, sign).edges("|Y and >Z").fillet(TAB_ROUND))
+    bottom = bottom.union(ybox(tx0, tx1, Y0, t, -0.01, TAB_TOP, sign).edges("|Y and >Z").fillet(TAB_ROUND))
     bottom = bottom.union(prism([(t - 0.01, 1.6), (t + BARB, 2.2), (t + BARB, 2.5), (t - 0.01, 3.7)], tx0, tx1, sign))
-    top = top.cut(ybox(tx0 - END_GAP + SLOT_SHIFT, tx1 + END_GAP + SLOT_SHIFT, S.Y0 - 1, t + WALL_GAP, -0.01, TAB_TOP + 0.2, sign))
+    top = top.cut(ybox(tx0 - END_GAP + SLOT_SHIFT, tx1 + END_GAP + SLOT_SHIFT, Y0 - 1, t + WALL_GAP, -0.01, TAB_TOP + 0.2, sign))
     top = top.cut(prism([(t, 1.55), (t + BARB + 0.1, 2.25), (t + BARB + 0.1, 2.65), (t, 3.85)],
                         tx0 - END_GAP + SLOT_SHIFT, tx1 + END_GAP + SLOT_SHIFT, sign))
     return bottom, top
@@ -113,65 +171,65 @@ def logo():
                  .slot2D(math.hypot(bx - ax, by - ay) + w, w).extrude(LOGO_DEPTH + 1))
             out = s if out is None else out.union(s)
     for d in LOGO_DOTS:
-        out = out.union(F.cyl(pt(d), 2 * LOGO_DOT_R * LOGO_S, z0, TOP_Z + 1))
+        out = out.union(cyl(pt(d), 2 * LOGO_DOT_R * LOGO_S, z0, TOP_Z + 1))
     return out
 
 
 def bootsel(top, bx):
     x0, x1 = bx - TONGUE_A, bx + NUB_D / 2 + 0.9
     y0, y1 = BTN_Y - TONGUE_W / 2, BTN_Y + TONGUE_W / 2
-    top = top.cut(F.box(x0, x1 + SLIT, y0 - SLIT, y0, S.DECK_Z - 2.5, S.DECK_Z + 0.01))
-    top = top.cut(F.box(x0, x1 + SLIT, y1, y1 + SLIT, S.DECK_Z - 2.5, S.DECK_Z + 0.01))
-    top = top.cut(F.box(x1, x1 + SLIT, y0, y1, S.DECK_Z - 2.5, S.DECK_Z + 0.01))
-    top = top.cut(F.box(x0, x1, y0, y1, F.TAIL_TOP + TONGUE_T, S.DECK_Z + 0.01))   # dip on top: a target
-    return top.union(F.cyl((bx, BTN_Y), NUB_D, BTN_TOP + NUB_GAP, F.TAIL_TOP + 0.01))
+    top = top.cut(box(x0, x1 + SLIT, y0 - SLIT, y0, DECK_Z - 2.5, DECK_Z + 0.01))
+    top = top.cut(box(x0, x1 + SLIT, y1, y1 + SLIT, DECK_Z - 2.5, DECK_Z + 0.01))
+    top = top.cut(box(x1, x1 + SLIT, y0, y1, DECK_Z - 2.5, DECK_Z + 0.01))
+    top = top.cut(box(x0, x1, y0, y1, TAIL_TOP + TONGUE_T, DECK_Z + 0.01))   # dip on top: a target
+    return top.union(cyl((bx, BTN_Y), NUB_D, BTN_TOP + NUB_GAP, TAIL_TOP + 0.01))
 
 
 def led_skins(top):
-    for x0, x1, y0, y1 in F.WINDOWS:
-        top = top.cut(F.box(x0, x1, y0, y1, F.TAIL_TOP - 0.01, S.DECK_Z - DECK_SKIN))
+    for x0, x1, y0, y1 in LEDS:
+        top = top.cut(box(x0, x1, y0, y1, TAIL_TOP - 0.01, DECK_Z - DECK_SKIN))
     return top
 
 
 def build():
     # ---- top: blocks, the printed plate, the opening under it ----
-    body = F.fillet(F.fillet(S.outline(S.LOW_Z0, TOP_Z), "<X or >X", 0.8), "<Z", 1.0)
-    body = F.fillet(body, ">Z", 1.0)
-    upper = F.box(S.X0 - 1, S.X1 + 1, S.Y0 - 1, S.Y1 + 1, 0, TOP_Z + 1)
+    body = fillet(fillet(outline(LOW_Z0, TOP_Z), "<X or >X", 0.8), "<Z", 1.0)
+    body = fillet(body, ">Z", 1.0)
+    upper = box(X0 - 1, X1 + 1, Y0 - 1, Y1 + 1, 0, TOP_Z + 1)
     top, bottom = body.intersect(upper), body.cut(upper)      # split after filleting: no rounding at the joint
-    top = top.cut(F.box(S.X0 + S.FACE_LIP, JACK_STOP, S.POCKET_Y0, S.POCKET_Y1, -0.01, S.UP_Z1))
-    top = top.cut(F.box(S.X0 - 1, S.X0 + S.FACE_LIP + 0.01, F.JACK_Y0, F.JACK_Y1, -0.01, S.JACK_TOP + 0.25))
-    top = top.cut(F.box(JACK_STOP - 0.01, S.REAR_IN, F.CAV_Y0, F.CAV_Y1, -0.01, F.TAIL_TOP))
-    top = top.cut(F.box(S.FRONT_BLOCK_X1, S.REAR_BLOCK_X0, S.Y0 - 1, S.Y1 + 1, S.DECK_Z, OPEN_Z1))
-    for x in (S.FRONT_BLOCK_X1, S.REAR_BLOCK_X0):
-        top = F.fillet(top, cq.selectors.BoxSelector((x - 0.1, S.Y0 - 1, S.DECK_Z + 0.1), (x + 0.1, S.Y1 + 1, OPEN_Z1 - 0.1)),
-                       S.EDGE_R)
-    for y0, y1 in ((F.CAV_Y0, 0.6), (F.BOARD_W - 0.6, F.CAV_Y1)):
-        top = top.union(F.box(20.0, F.CAV_X1, y0, y1, 0, F.TAIL_TOP))
-    for xy in F.SCREWS:                                       # pads pressing the board down
-        top = top.union(F.cyl(xy, F.BOSS_D, 0, F.TAIL_TOP + 0.01))
+    top = top.cut(box(X0 + FACE_LIP, JACK_STOP, POCKET_Y0, POCKET_Y1, -0.01, UP_Z1))
+    top = top.cut(box(X0 - 1, X0 + FACE_LIP + 0.01, JACK_Y0, JACK_Y1, -0.01, JACK_TOP + 0.25))
+    top = top.cut(box(JACK_STOP - 0.01, REAR_IN, CAV_Y0, CAV_Y1, -0.01, TAIL_TOP))
+    top = top.cut(box(FRONT_BLOCK_X1, REAR_BLOCK_X0, Y0 - 1, Y1 + 1, DECK_Z, OPEN_Z1))
+    for x in (FRONT_BLOCK_X1, REAR_BLOCK_X0):
+        top = fillet(top, cq.selectors.BoxSelector((x - 0.1, Y0 - 1, DECK_Z + 0.1), (x + 0.1, Y1 + 1, OPEN_Z1 - 0.1)),
+                       EDGE_R)
+    for y0, y1 in ((CAV_Y0, 0.6), (BOARD_W - 0.6, CAV_Y1)):
+        top = top.union(box(20.0, CAV_X1, y0, y1, 0, TAIL_TOP))
+    for xy in BOARD_HOLES:                                       # pads pressing the board down
+        top = top.union(cyl(xy, BOSS_D, 0, TAIL_TOP + 0.01))
     top = top.cut(logo())
 
     # ---- bottom ----
-    bottom = bottom.cut(F.box(F.CAV_X0, S.REAR_IN, F.CAV_Y0, F.CAV_Y1, F.UNDER_Z, 1))
-    bottom = bottom.cut(F.box(F.CAV_X0, BOARD_END, F.CAV_Y0 - BOARD_FIT, F.CAV_Y1 + BOARD_FIT, -F.BOARD_T - 0.1, 1))
-    bottom = bottom.cut(F.box(S.X0 - 1, F.CAV_X0 + 0.01, F.JACK_Y0, F.JACK_Y1, -0.2, 1))
-    for y0, y1 in ((F.CAV_Y0, 0.6), (F.BOARD_W - 0.6, F.CAV_Y1)):
-        bottom = bottom.union(F.box(F.CAV_X0, F.CAV_X1, y0, y1, F.UNDER_Z, -F.BOARD_T))
-    for xy in F.SCREWS:
-        bottom = bottom.union(F.cyl(xy, F.BOSS_D, F.UNDER_Z - 0.01, -F.BOARD_T))
+    bottom = bottom.cut(box(CAV_X0, REAR_IN, CAV_Y0, CAV_Y1, UNDER_Z, 1))
+    bottom = bottom.cut(box(CAV_X0, BOARD_END, CAV_Y0 - BOARD_FIT, CAV_Y1 + BOARD_FIT, -BOARD_T - 0.1, 1))
+    bottom = bottom.cut(box(X0 - 1, CAV_X0 + 0.01, JACK_Y0, JACK_Y1, -0.2, 1))
+    for y0, y1 in ((CAV_Y0, 0.6), (BOARD_W - 0.6, CAV_Y1)):
+        bottom = bottom.union(box(CAV_X0, CAV_X1, y0, y1, UNDER_Z, -BOARD_T))
+    for xy in BOARD_HOLES:
+        bottom = bottom.union(cyl(xy, BOSS_D, UNDER_Z - 0.01, -BOARD_T))
 
-    usb = (cq.Workplane("YZ", origin=(F.CAV_X1 - 2, F.USB_Y, F.USB_Z))
-           .placeSketch(F.rrect(F.USB_W, F.USB_H, 1.0)).extrude(10))
-    usb = usb.union(cq.Workplane("YZ", origin=(S.X1 - 0.5, F.USB_Y, F.USB_Z))
-                    .placeSketch(F.rrect(F.USB_W, F.USB_H, 1.0),
-                                 F.rrect(F.USB_W + 1.0, F.USB_H + 1.0, 1.5).moved(cq.Location(cq.Vector(0, 0, 0.5))))
+    usb = (cq.Workplane("YZ", origin=(CAV_X1 - 2, USB_Y, USB_Z))
+           .placeSketch(rrect(USB_W, USB_H, 1.0)).extrude(10))
+    usb = usb.union(cq.Workplane("YZ", origin=(X1 - 0.5, USB_Y, USB_Z))
+                    .placeSketch(rrect(USB_W, USB_H, 1.0),
+                                 rrect(USB_W + 1.0, USB_H + 1.0, 1.5).moved(cq.Location(cq.Vector(0, 0, 0.5))))
                     .loft())
     # the receptacle is flush with the board's top face on the real board (WIZnet's STEP
     # shows it 0.99 mm lower), so only the top is cut
     top = top.cut(usb)
 
-    bottom = bottom.union(F.box(SHELF_X0, S.REAR_IN + 0.01, F.CAV_Y0, F.CAV_Y1, F.UNDER_Z - 0.01, -F.BOARD_T))
+    bottom = bottom.union(box(SHELF_X0, REAR_IN + 0.01, CAV_Y0, CAV_Y1, UNDER_Z - 0.01, -BOARD_T))
 
     for root, tip in ARMS:
         for sign in (1, -1):
@@ -184,7 +242,7 @@ def build():
 
 def on_side(part):
     """Long side on the bed, for the print STL."""
-    return part.rotate((0, 0, 0), (1, 0, 0), 90).translate((0, 0, -S.Y0))
+    return part.rotate((0, 0, 0), (1, 0, 0), 90).translate((0, 0, -Y0))
 
 
 if __name__ == "__main__":
@@ -200,7 +258,7 @@ if __name__ == "__main__":
     b = on_side(parts["top"]).val().BoundingBox()
     print(f"top as printed: z {b.zmin:.2f}..{b.zmax:.2f}")
     print("top/bottom overlap", round(parts["top"].val().intersect(parts["bottom"].val()).Volume(), 3), "mm3")
-    print(f"opening {S.REAR_BLOCK_X0 - S.FRONT_BLOCK_X1:.1f} x {OPEN_Z1 - S.DECK_Z:.2f} mm; overall height {TOP_Z - S.LOW_Z0:.1f}")
+    print(f"opening {REAR_BLOCK_X0 - FRONT_BLOCK_X1:.1f} x {OPEN_Z1 - DECK_Z:.2f} mm; overall height {TOP_Z - LOW_Z0:.1f}")
     if len(sys.argv) > 1:
         import assembly as A
         evb = A.evb_parts(sys.argv[1])

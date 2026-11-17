@@ -7,10 +7,6 @@ tunable are in the README next to each case.
 | Folder | What |
 |---|---|
 | `enclosure/evb-snapframe/` | The two-piece printed snap case. [README](../enclosure/evb-snapframe/README.md) |
-| `enclosure/evb-sandwich/` | Base geometry the snap case builds on, and the board model loader. |
-| `enclosure/evb-fdm/` | Shared board dimensions. |
-
-The scripts find each other by relative path, so keep this layout.
 
 ![sheet](img/evb_snapframe_sheet.png)
 

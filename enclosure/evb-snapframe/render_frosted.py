@@ -10,9 +10,9 @@ matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 import numpy as np
 
+import assembly as A
+
 HERE = os.path.dirname(os.path.abspath(__file__))
-sys.path.insert(0, os.path.join(HERE, "..", "evb-sandwich"))
-import assembly as A  # noqa: E402
 
 STEP = sys.argv[1] if len(sys.argv) > 1 else os.path.join(HERE, "..", "..", "ref", "W55RP20-EVB-Pico_V100.step")
 COL = {"pcb": (0.10, 0.42, 0.22), "metal": (0.70, 0.72, 0.74), "part": (0.15, 0.15, 0.17)}
