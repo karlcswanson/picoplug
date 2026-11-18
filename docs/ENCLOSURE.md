@@ -1,7 +1,6 @@
 # Picoplug Enclosure
 
-A two-piece printed case for the W55RP20-EVB-Pico: a clear top and a colored bottom that
-snap together, no screws.
+A two-piece printed case for the W55RP20-EVB-Pico: a clear top and a colored bottom that snap together, no screws.
 
 86.4 x 28.0 x 21.3 mm, about 20 g of filament.
 
@@ -23,24 +22,21 @@ The files are in `enclosure/evb-snapframe/`.
 
 ## Generating the case
 
-The STL files are ready to print. To change the case, edit the constants at the top of
-`enclosure/evb-snapframe/evb_snapframe.py` (for a tighter or looser snap, `BARB` in 0.1 mm
-steps). Needs [uv](https://docs.astral.sh/uv/). From `enclosure/evb-snapframe`:
+The STL files are ready to print. To change the case, edit the constants at the top of `enclosure/evb-snapframe/evb_snapframe.py` (for a tighter or looser snap, `BARB` in 0.1 mm steps). Needs [uv](https://docs.astral.sh/uv/). From `enclosure/evb-snapframe`:
 
-```
+```sh
 uv run evb_snapframe.py
 ```
 
-To also check the fit against the board, pass WIZnet's 3D model of it,
-`W55RP20-EVB-Pico_V100.step` from WIZnet's documentation (not in the repo):
+To also check the fit against the board, pass WIZnet's 3D model of it, `W55RP20-EVB-Pico_V100.step` from WIZnet's documentation (not in the repo):
 
-```
+```sh
 uv run evb_snapframe.py path/to/W55RP20-EVB-Pico_V100.step
 ```
 
 The images on this page:
 
-```
+```sh
 uv run render_snapframe.py
 uv run render_bed.py
 uv run render_frosted.py path/to/W55RP20-EVB-Pico_V100.step
