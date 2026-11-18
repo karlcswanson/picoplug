@@ -1,4 +1,4 @@
-"""All-printed two-piece case for the W55RP20-EVB-Pico: a block round the RJ45 and one over
+"""All-printed two-piece case for the W55RP20-EVB-Pico: a block around the RJ45 and one over
 the USB-C, an opening between them under a printed plate with the project logo sunk into
 it, and PLA-friendly snaps holding the halves together.
 
@@ -14,7 +14,7 @@ long bridge left, 22 mm, and it comes out rough. The .stl files for the top are 
 rotated for that; the .step files stay in case coordinates.
 
 Run:  uv run evb_snapframe.py [path/to/W55RP20-EVB-Pico_V100.step]
-With the board STEP given it checks overlaps and writes the coloured assembly too.
+With the board STEP given it checks overlaps and writes the colored assembly too.
 """
 import math
 import os
@@ -44,9 +44,9 @@ FLOOR = 1.6                                       # floor and deck, 4 lines at 0
 CAV_X0, CAV_X1 = -0.2, BOARD_L + 0.25             # board cavity
 CAV_Y0, CAV_Y1 = -0.25, BOARD_W + 0.25
 BOSS_D = 4.8                                      # pads over and under the board's holes
-TAB_CLR = 1.2                                     # round the RJ45 cage body on top and both sides:
+TAB_CLR = 1.2                                     # around the RJ45 cage body on top and both sides:
 POCKET_Y0, POCKET_Y1 = 2.55 - TAB_CLR, 18.45 + TAB_CLR   # its spring tabs stay inside
-FACE_LIP = 1.0                                    # front lip round the cage, 0.25 clear
+FACE_LIP = 1.0                                    # front lip around the cage, 0.25 clear
 X0, X1 = JACK_FACE_X, 81.6                        # flush with the jack face; the USB-C mouth (80.6)
                                                   # sits 1 mm inside the face
 REAR_IN = 79.4                                    # inside of the rear wall: the lip over the board's end
@@ -55,7 +55,7 @@ R = 4.0                                           # plan corner radius
 LOW_Z0 = UNDER_Z - FLOOR                          # case bottom
 UP_Z1 = JACK_TOP + TAB_CLR                        # top of the jack pocket
 DECK_Z = TAIL_TOP + FLOOR                         # deck over the board, under the opening
-FRONT_BLOCK_X1 = 22.3                             # block round the cage ends 4 mm behind the pocket
+FRONT_BLOCK_X1 = 22.3                             # block around the cage ends 4 mm behind the pocket
 REAR_BLOCK_X0 = 70.0                              # block over the USB-C
 EDGE_R = 1.0
 
@@ -69,7 +69,7 @@ ARM_T, TAB_L = 1.2, 7.0
 END_SLIT, BACK_GAP = 0.6, 0.6
 BARB, WALL_GAP = 0.6, 0.1     # hook = BARB - WALL_GAP
 END_GAP = 0.2                 # clip ends to the top's openings: the only thing locating the halves along x
-SLOT_SHIFT = 0.0              # moves the top's openings along x, if a printed top sits off-centre
+SLOT_SHIFT = 0.0              # moves the top's openings along x, if a printed top sits off-center
 TAB_ROUND = 0.8               # clip tops rounded at both ends, to clear the openings' printed inside corners
 TAB_TOP = 3.9
 
