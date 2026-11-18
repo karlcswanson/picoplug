@@ -19,7 +19,8 @@ Picoplug runs on WIZnet's [W55RP20-EVB-Pico](https://wiznet.io/products/evaluati
 1. **Purchase a W55RP20-EVB-Pico:** [DigiKey](https://www.digikey.com/en/products/detail/wiznet/W55RP20-EVB-PICO/24717058), [Mouser](https://www.mouser.com/en/ProductDetail/WIZnet/W55RP20-EVB-Pico?qs=IKkN%2F947nfCQ%252BaR4QuygXA%3D%3D)
 2. **Download the firmware:** [latest release](https://github.com/karlcswanson/picoplug/releases/latest)
 3. **Flash the firmware:** Hold down the BOOTSEL button when plugging the board into the computer. Once the `RPI-RP2` volume appears, drag on the `-w55rp20.uf2` firmware file.
-4. **Plug it into your phone:** The picoplug is accessible at http://192.168.7.1 or http://picoplug.local. The IP address can be changed in the Settings tab. Android and iOS devices handle network routes slightly differently. For use on Android devices, Airplane mode may need to be enabled to access the picoplug.
+4. **Print the case (optional):** [STL files and print settings](docs/ENCLOSURE.md)
+5. **Plug it into your phone:** The picoplug is accessible at http://192.168.7.1 or http://picoplug.local. The IP address can be changed in the Settings tab. Android and iOS devices handle network routes slightly differently. For use on Android devices, Airplane mode may need to be enabled to access the picoplug.
 
 ## Features
 

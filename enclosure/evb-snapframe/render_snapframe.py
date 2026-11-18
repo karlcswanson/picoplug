@@ -20,7 +20,7 @@ def tris(shape, dz=0.0):
 
 
 def view(parts, elev, azim, px=900, mm=125.0):
-    """Orthographic z-buffer render: parts are (triangles, colour)."""
+    """Orthographic z-buffer render: parts are (triangles, color)."""
     e, a = np.radians(elev), np.radians(azim)
     fwd = np.array([np.cos(e) * np.cos(a), np.cos(e) * np.sin(a), np.sin(e)])    # towards the viewer
     right = np.array([-np.sin(a), np.cos(a), 0.0])

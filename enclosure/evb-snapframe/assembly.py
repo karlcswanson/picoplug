@@ -1,5 +1,5 @@
 """WIZnet's board model for the snap frame: loads it (without the pin headers in WIZnet's
-model; the board ships without them) and writes coloured USDZ previews of the case with the
+model; the board ships without them) and writes colored USDZ previews of the case with the
 board inside. Used by evb_snapframe.py and render_frosted.py; everything is in the case's
 coordinates, so nothing moves."""
 import os
@@ -18,7 +18,7 @@ MATERIALS = {                      # name: (diffuse RGB, opacity)
 
 
 def evb_parts(step):
-    """WIZnet's solids, coloured by shape: the board green, the RJ45 cage metal, the rest dark."""
+    """WIZnet's solids, colored by shape: the board green, the RJ45 cage metal, the rest dark."""
     out = []
     for i, s in enumerate(cq.importers.importStep(step).solids().vals()):
         b = s.BoundingBox()
