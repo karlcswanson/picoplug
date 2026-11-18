@@ -1,0 +1,6 @@
+{
+  // one line per paragraph
+  "MD013": false,
+  // <picture> for the light and dark screenshots
+  "MD033": false
+}
