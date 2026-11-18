@@ -12,7 +12,9 @@ Picoplug turns a $12 WIZnet development board into a pocket network tool. The pi
 
 ## Hardware
 
-Picoplug runs on WIZnet's [W55RP20-EVB-Pico](https://wiznet.io/products/evaluation-boards/w55rp20-evb-pico) board. This  $12 development board is available through electronic component distributers like DigiKey and Mouser. The board hosts a [W55RP20](https://wiznet.io/products/mcu-chips/w55rp20), this SiP includes a RP2040 microcontroller and W5500 Ethernet controller into a tiny 8mm x 8mm package. Picoplug boots within seconds and is powered by the phone. Files for printing the case are included in the project.
+Picoplug runs on WIZnet's [W55RP20-EVB-Pico](https://wiznet.io/products/evaluation-boards/w55rp20-evb-pico) board. This  $12 development board is available through electronic component distributors like DigiKey and Mouser. The board hosts a [W55RP20](https://wiznet.io/products/mcu-chips/w55rp20), this SiP includes a RP2040 microcontroller and W5500 Ethernet controller into a tiny 8mm x 8mm package. Picoplug boots within seconds and is powered by the phone. Files for printing the case are included in the project.
+
+<img src="docs/img/case.png" alt="The printed case: a clear top with the logo sunk into it on a yellow bottom, the board visible inside" width="380">
 
 ## Make your own picoplug
 
